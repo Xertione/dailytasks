@@ -13,11 +13,12 @@ pub fn init_db(app_dir: &Path) -> SqliteResult<Connection> {
     conn.execute_batch("PRAGMA foreign_keys=ON;")?;
 
     conn.execute_batch(
-        "CREATE TABLE IF NOT EXISTS tasks (
+        "        CREATE TABLE IF NOT EXISTS tasks (
             id TEXT PRIMARY KEY,
             title TEXT NOT NULL,
             description TEXT NOT NULL DEFAULT '',
             status TEXT NOT NULL DEFAULT 'pending',
+            progress INTEGER NOT NULL DEFAULT 0,
             star_value INTEGER NOT NULL DEFAULT 0,
             star_reason TEXT NOT NULL DEFAULT '',
             urgency INTEGER NOT NULL DEFAULT 0,
@@ -43,6 +44,20 @@ pub fn init_db(app_dir: &Path) -> SqliteResult<Connection> {
             value TEXT NOT NULL DEFAULT ''
         );",
     )?;
+
+    // Migration: add progress column if missing (for existing databases)
+    let has_progress: i32 = conn
+        .query_row(
+            "SELECT COUNT(*) FROM pragma_table_info('tasks') WHERE name='progress'",
+            [],
+            |row| row.get(0),
+        )
+        .unwrap_or(0);
+    if has_progress == 0 {
+        conn.execute_batch("ALTER TABLE tasks ADD COLUMN progress INTEGER NOT NULL DEFAULT 0;")
+            .ok();
+        log::info!("Migration: added progress column to tasks");
+    }
 
     log::info!("Database initialized at {:?}", db_path);
     Ok(conn)

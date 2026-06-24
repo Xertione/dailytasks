@@ -58,7 +58,12 @@ export function ProgressPanel() {
           </span>
         </div>
 
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-2">
+          {stats.total_stars > 0 && (
+            <span className="text-accent-400 font-medium tabular-nums">
+              ⭐ {stats.total_stars} 颗星
+            </span>
+          )}
           {stats.high_star_cnt > 0 && (
             <>
               <Flame size={12} className="text-accent-400 drop-shadow-[0_0_3px_rgba(251,191,36,0.5)]" />

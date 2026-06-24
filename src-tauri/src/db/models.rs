@@ -6,6 +6,7 @@ pub struct Task {
     pub title: String,
     pub description: String,
     pub status: String,         // pending | in_progress | done | archived
+    pub progress: i32,          // 0-100, task progress percentage
     pub star_value: i32,        // 0=未评估, 1~3
     pub star_reason: String,
     pub urgency: i32,
@@ -25,6 +26,7 @@ pub struct DailyStats {
     pub completed_cnt: i32,
     pub total_cnt: i32,
     pub high_star_cnt: i32,
+    pub total_stars: i32,       // accumulated stars from completed tasks
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

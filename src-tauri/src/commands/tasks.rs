@@ -22,6 +22,7 @@ pub fn add_task(
         title: title.clone(),
         description: description.clone(),
         status: "pending".to_string(),
+        progress: 0,
         star_value: 0,
         star_reason: String::new(),
         urgency: 0,
@@ -37,10 +38,10 @@ pub fn add_task(
 
     let conn = db.lock();
     conn.execute(
-        "INSERT INTO tasks (id, title, description, status, star_value, star_reason, urgency, value_score, potential, estimated_min, due_at, remind_at, created_at, updated_at, completed_at)
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15)",
+        "INSERT INTO tasks (id, title, description, status, progress, star_value, star_reason, urgency, value_score, potential, estimated_min, due_at, remind_at, created_at, updated_at, completed_at)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16)",
         rusqlite::params![
-            task.id, task.title, task.description, task.status,
+            task.id, task.title, task.description, task.status, task.progress,
             task.star_value, task.star_reason, task.urgency, task.value_score,
             task.potential, task.estimated_min, task.due_at, task.remind_at,
             task.created_at, task.updated_at, task.completed_at
@@ -67,6 +68,7 @@ pub fn update_task(
     title: String,
     description: String,
     status: String,
+    progress: i32,
     star_value: i32,
     due_at: Option<String>,
     remind_at: Option<String>,
@@ -83,8 +85,8 @@ pub fn update_task(
 
     let conn = db.lock();
     conn.execute(
-        "UPDATE tasks SET title=?1, description=?2, status=?3, star_value=?4, due_at=?5, remind_at=?6, updated_at=?7, completed_at=?8 WHERE id=?9",
-        rusqlite::params![title, description, status, star_value, due_at, remind_at, now, completed_at, id],
+        "UPDATE tasks SET title=?1, description=?2, status=?3, progress=?4, star_value=?5, due_at=?6, remind_at=?7, updated_at=?8, completed_at=?9 WHERE id=?10",
+        rusqlite::params![title, description, status, progress, star_value, due_at, remind_at, now, completed_at, id],
     )
     .map_err(|e| e.to_string())?;
 
@@ -104,7 +106,7 @@ pub fn get_all_tasks(db: State<'_, DbConnection>) -> Result<Vec<Task>, String> {
     let conn = db.lock();
     let mut stmt = conn
         .prepare(
-            "SELECT id, title, description, status, star_value, star_reason, urgency, value_score, potential, estimated_min, due_at, remind_at, created_at, updated_at, completed_at
+            "SELECT id, title, description, status, progress, star_value, star_reason, urgency, value_score, potential, estimated_min, due_at, remind_at, created_at, updated_at, completed_at
              FROM tasks ORDER BY created_at DESC",
         )
         .map_err(|e| e.to_string())?;
@@ -129,7 +131,7 @@ fn get_task_internal(
     id: &str,
 ) -> Result<Task, String> {
     conn.query_row(
-        "SELECT id, title, description, status, star_value, star_reason, urgency, value_score, potential, estimated_min, due_at, remind_at, created_at, updated_at, completed_at
+        "SELECT id, title, description, status, progress, star_value, star_reason, urgency, value_score, potential, estimated_min, due_at, remind_at, created_at, updated_at, completed_at
          FROM tasks WHERE id = ?1",
         rusqlite::params![id],
         map_task,
@@ -140,7 +142,6 @@ fn get_task_internal(
 #[tauri::command]
 pub fn get_today_stats(db: State<'_, DbConnection>) -> Result<DailyStats, String> {
     let conn = db.lock();
-    let today = chrono::Utc::now().format("%Y-%m-%d").to_string();
 
     let total_cnt: i32 = conn
         .query_row(
@@ -152,8 +153,8 @@ pub fn get_today_stats(db: State<'_, DbConnection>) -> Result<DailyStats, String
 
     let completed_cnt: i32 = conn
         .query_row(
-            "SELECT COUNT(*) FROM tasks WHERE status = 'done' AND date(completed_at) = ?1",
-            rusqlite::params![today],
+            "SELECT COUNT(*) FROM tasks WHERE status = 'done'",
+            [],
             |row| row.get(0),
         )
         .unwrap_or(0);
@@ -166,12 +167,55 @@ pub fn get_today_stats(db: State<'_, DbConnection>) -> Result<DailyStats, String
         )
         .unwrap_or(0);
 
+    let total_stars: i32 = conn
+        .query_row(
+            "SELECT COALESCE(SUM(star_value), 0) FROM tasks WHERE status = 'done'",
+            [],
+            |row| row.get(0),
+        )
+        .unwrap_or(0);
+
+    let today = chrono::Utc::now().format("%Y-%m-%d").to_string();
+
     Ok(DailyStats {
         date: today,
         completed_cnt,
         total_cnt,
         high_star_cnt,
+        total_stars,
     })
+}
+
+#[tauri::command]
+pub fn update_progress(
+    id: String,
+    progress: i32,
+    db: State<'_, DbConnection>,
+) -> Result<Task, String> {
+    let now = chrono::Utc::now()
+        .format("%Y-%m-%dT%H:%M:%S%.3fZ")
+        .to_string();
+    let conn = db.lock();
+
+    // Auto-transition to done when progress reaches 100
+    let completed_at = if progress >= 100 {
+        Some(now.clone())
+    } else {
+        None
+    };
+    let new_status = if progress >= 100 {
+        "done"
+    } else {
+        "in_progress"
+    };
+
+    conn.execute(
+        "UPDATE tasks SET progress=?1, status=?2, updated_at=?3, completed_at=?4 WHERE id=?5",
+        rusqlite::params![progress, new_status, now, completed_at, id],
+    )
+    .map_err(|e| e.to_string())?;
+
+    get_task_internal(&conn, &id)
 }
 
 #[tauri::command]
@@ -203,16 +247,17 @@ fn map_task(row: &rusqlite::Row<'_>) -> rusqlite::Result<Task> {
         title: row.get(1)?,
         description: row.get(2)?,
         status: row.get(3)?,
-        star_value: row.get(4)?,
-        star_reason: row.get(5)?,
-        urgency: row.get(6)?,
-        value_score: row.get(7)?,
-        potential: row.get(8)?,
-        estimated_min: row.get(9)?,
-        due_at: row.get(10)?,
-        remind_at: row.get(11)?,
-        created_at: row.get(12)?,
-        updated_at: row.get(13)?,
-        completed_at: row.get(14)?,
+        progress: row.get(4)?,
+        star_value: row.get(5)?,
+        star_reason: row.get(6)?,
+        urgency: row.get(7)?,
+        value_score: row.get(8)?,
+        potential: row.get(9)?,
+        estimated_min: row.get(10)?,
+        due_at: row.get(11)?,
+        remind_at: row.get(12)?,
+        created_at: row.get(13)?,
+        updated_at: row.get(14)?,
+        completed_at: row.get(15)?,
     })
 }

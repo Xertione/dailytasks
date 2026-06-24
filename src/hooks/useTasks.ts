@@ -3,6 +3,7 @@ import {
   getTasks,
   addTask as ipcAddTask,
   updateTask as ipcUpdateTask,
+  updateProgress as ipcUpdateProgress,
   deleteTask as ipcDeleteTask,
   getTodayStats,
 } from '@/lib/ipc'
@@ -32,9 +33,21 @@ export function useUpdateTask() {
   return useMutation({
     mutationFn: (params: {
       id: string; title: string; description: string; status: string
-      star_value: number; due_at: string | null; remind_at: string | null
+      progress: number; star_value: number; due_at: string | null; remind_at: string | null
     }) =>
-      ipcUpdateTask(params.id, params.title, params.description, params.status, params.star_value, params.due_at, params.remind_at),
+      ipcUpdateTask(params.id, params.title, params.description, params.status, params.progress, params.star_value, params.due_at, params.remind_at),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['tasks'] })
+      queryClient.invalidateQueries({ queryKey: ['todayStats'] })
+    },
+  })
+}
+
+export function useUpdateProgress() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (params: { id: string; progress: number }) =>
+      ipcUpdateProgress(params.id, params.progress),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['tasks'] })
       queryClient.invalidateQueries({ queryKey: ['todayStats'] })

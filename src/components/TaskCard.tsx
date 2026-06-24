@@ -3,7 +3,7 @@ import { Trash2, Check, Star, Clock } from 'lucide-react'
 import { format, isPast, isToday } from 'date-fns'
 import { cn } from '@/lib/utils'
 import type { Task } from '@/lib/ipc'
-import { useUpdateTask, useDeleteTask } from '@/hooks/useTasks'
+import { useUpdateTask, useUpdateProgress, useDeleteTask } from '@/hooks/useTasks'
 import { updateStarRating } from '@/lib/ipc'
 import { StarBadge } from './StarBadge'
 
@@ -14,6 +14,7 @@ interface TaskCardProps {
 export function TaskCard({ task }: TaskCardProps) {
   const [showStarPicker, setShowStarPicker] = useState(false)
   const updateTask = useUpdateTask()
+  const updateProgress = useUpdateProgress()
   const deleteTask = useDeleteTask()
 
   const isDone = task.status === 'done'
@@ -21,22 +22,44 @@ export function TaskCard({ task }: TaskCardProps) {
   const deadlineToday = task.due_at && isToday(new Date(task.due_at))
 
   const handleStatusChange = async () => {
-    const nextStatus =
-      task.status === 'pending'
-        ? 'in_progress'
-        : task.status === 'in_progress'
-          ? 'done'
-          : 'pending'
+    let nextStatus: string, nextProgress: number
+    if (task.status === 'pending') {
+      nextStatus = 'in_progress'
+      nextProgress = 25
+    } else if (task.status === 'in_progress') {
+      nextStatus = 'done'
+      nextProgress = 100
+    } else {
+      return // done stays done, don't cycle
+    }
 
     await updateTask.mutateAsync({
       id: task.id,
       title: task.title,
       description: task.description,
       status: nextStatus,
+      progress: nextProgress,
       star_value: task.star_value,
       due_at: task.due_at,
       remind_at: task.remind_at,
     })
+  }
+
+  const handleProgressChange = async (pct: number) => {
+    if (pct >= 100) {
+      await updateTask.mutateAsync({
+        id: task.id,
+        title: task.title,
+        description: task.description,
+        status: 'done',
+        progress: 100,
+        star_value: task.star_value,
+        due_at: task.due_at,
+        remind_at: task.remind_at,
+      })
+    } else {
+      await updateProgress.mutateAsync({ id: task.id, progress: pct })
+    }
   }
 
   const handleStarChange = async (rating: number) => {
@@ -175,6 +198,27 @@ export function TaskCard({ task }: TaskCardProps) {
               </span>
             )}
           </div>
+
+          {/* Progress indicator */}
+          {task.status === 'in_progress' && (
+            <div className="flex items-center gap-1 mt-2">
+              <span className="text-[10px] text-text-tertiary mr-1">进度</span>
+              {[25, 50, 75, 100].map(pct => (
+                <button
+                  key={pct}
+                  type="button"
+                  onClick={() => handleProgressChange(pct)}
+                  className={cn(
+                    'w-5 h-1.5 rounded-full transition-all duration-200',
+                    task.progress >= pct ? 'bg-accent-500' : 'bg-surface-3',
+                    task.progress === pct && 'ring-1 ring-accent-400/50',
+                  )}
+                  title={`${pct}%`}
+                />
+              ))}
+              <span className="text-[10px] text-text-secondary ml-1 tabular-nums">{task.progress}%</span>
+            </div>
+          )}
         </div>
 
         {/* Delete button */}

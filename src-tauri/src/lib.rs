@@ -177,6 +177,7 @@ pub fn run() {
             commands::tasks::get_all_tasks,
             commands::tasks::get_task,
             commands::tasks::get_today_stats,
+            commands::tasks::update_progress,
             commands::tasks::update_star_rating,
             commands::ai::analyze_task_manually,
             commands::ai::get_ai_status,

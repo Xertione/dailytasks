@@ -9,6 +9,7 @@ export interface Task {
   title: string
   description: string
   status: 'pending' | 'in_progress' | 'done' | 'archived'
+  progress: number             // 0-100
   star_value: number           // 0=未评估, 1~3
   star_reason: string          // AI 打分理由
   urgency: number              // 紧急度 1~3
@@ -27,6 +28,7 @@ export interface DailyStats {
   completed_cnt: number
   total_cnt: number
   high_star_cnt: number
+  total_stars: number  // accumulated stars from done tasks
 }
 
 export interface AiResult {
@@ -56,14 +58,19 @@ export async function updateTask(
   title: string,
   description: string,
   status: string,
+  progress: number,
   star_value: number,
   due_at: string | null,
   remind_at: string | null,
 ): Promise<Task> {
   return invoke('update_task', {
     id, title, description, status,
-    star_value, due_at, remind_at,
+    progress, star_value, due_at, remind_at,
   })
+}
+
+export async function updateProgress(id: string, progress: number): Promise<Task> {
+  return invoke('update_progress', { id, progress })
 }
 
 export async function deleteTask(id: string): Promise<void> {
