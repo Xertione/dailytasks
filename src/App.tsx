@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from 'react'
+import { useState, useCallback } from 'react'
 import { Settings } from 'lucide-react'
 import { ChatView } from '@/components/ChatView'
 import { useUiStore } from '@/stores/uiStore'
