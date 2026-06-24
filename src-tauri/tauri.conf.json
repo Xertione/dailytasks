@@ -42,9 +42,6 @@
     ]
   },
   "plugins": {
-    "notification": {
-      "enabled": true
-    },
     "shell": {
       "open": true
     }
