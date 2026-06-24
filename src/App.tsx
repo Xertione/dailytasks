@@ -31,7 +31,7 @@ function App() {
       <AppErrorBoundary>
         <OnboardingView onComplete={() => {
           localStorage.setItem('daily-tasks-api-key', 'true')
-          setShowOnboarding(false)
+          window.location.reload()
         }} />
       </AppErrorBoundary>
     )
