@@ -21,10 +21,8 @@ function App() {
   const { toggleSettings } = useUiStore()
 
   // Use localStorage flag instead of IPC to avoid bridge timing issues
-  const configured = typeof window !== 'undefined'
-    && localStorage.getItem('daily-tasks-api-key') === 'true'
-
-  const [showOnboarding, setShowOnboarding] = useState(!configured)
+  const showOnboarding = !(typeof window !== 'undefined'
+    && localStorage.getItem('daily-tasks-api-key') === 'true')
 
   if (showOnboarding) {
     return (
