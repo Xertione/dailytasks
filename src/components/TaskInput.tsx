@@ -23,6 +23,18 @@ export function TaskInput() {
   const addTask = useAddTask()
   const setCountdown = useSetCountdown()
 
+  const DATETIME_MIN = '2000-01-01T00:00'
+  const DATETIME_MAX = '2099-12-31T23:59'
+
+  const validateDatetime = (value: string): string => {
+    if (!value) return ''
+    const d = new Date(value)
+    if (isNaN(d.getTime())) return ''
+    const year = d.getFullYear()
+    if (year < 2000 || year > 2099) return ''
+    return value
+  }
+
   useEffect(() => {
     const handler = () => inputRef.current?.focus()
     window.addEventListener('focus-task-input', handler)
@@ -52,8 +64,11 @@ export function TaskInput() {
     const trimmed = title.trim()
     if (!trimmed || addTask.isPending) return
 
-    const dueAt = deadline ? new Date(deadline).toISOString() : null
-    const remindAt = reminder ? new Date(reminder).toISOString() : null
+    const validDeadline = validateDatetime(deadline)
+    const validReminder = validateDatetime(reminder)
+    if ((deadline && !validDeadline) || (reminder && !validReminder)) return
+    const dueAt = validDeadline ? new Date(validDeadline).toISOString() : null
+    const remindAt = validReminder ? new Date(validReminder).toISOString() : null
 
     const newTask = await addTask.mutateAsync({ title: trimmed, due_at: dueAt, remind_at: remindAt })
     if (countdownSecs > 0 && newTask) {
@@ -138,8 +153,11 @@ export function TaskInput() {
                 </label>
                 <input
                   type="datetime-local"
+                  min={DATETIME_MIN}
+                  max={DATETIME_MAX}
                   value={deadline}
                   onChange={(e) => setDeadline(e.target.value)}
+                  onBlur={(e) => setDeadline(validateDatetime(e.target.value))}
                   className={cn(
                     'w-full bg-surface-2 border border-surface-3 rounded-md px-2 py-1.5',
                     'text-xs text-text-primary',
@@ -154,8 +172,11 @@ export function TaskInput() {
                 </label>
                 <input
                   type="datetime-local"
+                  min={DATETIME_MIN}
+                  max={DATETIME_MAX}
                   value={reminder}
                   onChange={(e) => setReminder(e.target.value)}
+                  onBlur={(e) => setReminder(validateDatetime(e.target.value))}
                   className={cn(
                     'w-full bg-surface-2 border border-surface-3 rounded-md px-2 py-1.5',
                     'text-xs text-text-primary',
