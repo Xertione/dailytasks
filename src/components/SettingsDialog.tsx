@@ -1,7 +1,9 @@
-import { X } from 'lucide-react'
+import { X, RefreshCw, CheckCircle, XCircle, AlertTriangle } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useUiStore, type NudgeStyle } from '@/stores/uiStore'
 import { useTasks, useTodayStats } from '@/hooks/useTasks'
+import { getAiStatus, type AiStatus } from '@/lib/ipc'
+import { useQuery } from '@tanstack/react-query'
 
 const nudgeOptions: { value: NudgeStyle; label: string; desc: string }[] = [
   { value: 'gentle', label: '温和', desc: '轻柔鼓励，适合压力大的时候' },
@@ -19,6 +21,12 @@ export function SettingsDialog() {
 
   const { data: tasks } = useTasks()
   const { data: stats } = useTodayStats()
+  const { data: aiStatus, isLoading: aiStatusLoading, refetch: refetchAiStatus } = useQuery<AiStatus>({
+    queryKey: ['aiStatus'],
+    queryFn: getAiStatus,
+    enabled: isSettingsOpen,
+    staleTime: 30_000,
+  })
 
   if (!isSettingsOpen) return null
 
@@ -92,7 +100,69 @@ export function SettingsDialog() {
             </div>
           </div>
 
-          {/* Data stats */}
+          {/* AI Status */}
+          <div>
+            <div className="flex items-center justify-between mb-2">
+              <label className="text-xs font-medium text-text-secondary">
+                AI 连接状态
+              </label>
+              <button
+                type="button"
+                onClick={() => refetchAiStatus()}
+                disabled={aiStatusLoading}
+                className="p-1 rounded text-text-tertiary hover:text-text-primary hover:bg-surface-2 transition-colors"
+              >
+                <RefreshCw size={12} className={cn(aiStatusLoading && 'animate-spin')} />
+              </button>
+            </div>
+            {aiStatus ? (
+              <div className="space-y-1.5 text-[11px]">
+                <div className="flex items-center gap-2">
+                  {aiStatus.status === 'ready' && aiStatus.api_test === 'ok' ? (
+                    <CheckCircle size={14} className="text-success" />
+                  ) : aiStatus.status === 'error' ? (
+                    <XCircle size={14} className="text-danger" />
+                  ) : (
+                    <AlertTriangle size={14} className="text-amber-400" />
+                  )}
+                  <span className={cn(
+                    'font-medium',
+                    aiStatus.status === 'ready' && aiStatus.api_test === 'ok' ? 'text-success' :
+                    aiStatus.status === 'error' ? 'text-danger' : 'text-amber-400'
+                  )}>
+                    {aiStatus.status === 'ready' && aiStatus.api_test === 'ok' ? '已连接' :
+                     aiStatus.status === 'error' ? '连接异常' : '离线'}
+                  </span>
+                </div>
+                <div className="bg-surface-2 rounded-md p-2.5 space-y-1 text-text-tertiary">
+                  <div className="flex justify-between">
+                    <span>Key</span>
+                    <span className="text-text-secondary font-mono">{aiStatus.key_preview}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>模型</span>
+                    <span className="text-text-secondary">{aiStatus.model}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>端点</span>
+                    <span className="text-text-secondary truncate max-w-[180px]">{aiStatus.base_url}</span>
+                  </div>
+                  {aiStatus.api_test_msg && (
+                    <div className={cn(
+                      'mt-2 pt-2 border-t border-surface-3',
+                      aiStatus.api_test === 'ok' ? 'text-success' : 'text-danger'
+                    )}>
+                      {aiStatus.api_test_msg}
+                    </div>
+                  )}
+                </div>
+              </div>
+            ) : aiStatusLoading ? (
+              <div className="text-[11px] text-text-tertiary animate-pulse">检测中...</div>
+            ) : (
+              <div className="text-[11px] text-text-disabled">无法获取状态</div>
+            )}
+          </div>
           <div>
             <label className="text-xs font-medium text-text-secondary mb-2 block">
               数据统计

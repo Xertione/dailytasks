@@ -19,7 +19,8 @@ pub fn add_task(
         .to_string();
 
     // Apply local_rules immediately for instant feedback — AI can refine later
-    let local = local_rules::evaluate(&title, &description, due_at.as_deref());
+    let mut local = local_rules::evaluate(&title, &description, due_at.as_deref());
+    local.reason = format!("📋 本地 (初始): {}", local.reason);
     log::info!(
         "add_task: local_rules → star={} (v={}, u={}, p={}) for '{}'",
         local.star_value, local.value_score, local.urgency, local.potential, title

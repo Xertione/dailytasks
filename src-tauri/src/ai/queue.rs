@@ -84,15 +84,16 @@ impl AnalysisQueue {
         item: &QueueItem,
     ) {
         // Try AI first if available, always fall back to local rules on failure
-        let ai_result = if provider.is_available() {
+        let (ai_result, ai_source, ai_error) = if provider.is_available() {
             match Self::analyze_with_retry(provider, &item.title, &item.description).await {
-                Ok(result) => {
+                Ok(mut result) => {
                     log::info!(
                         "AI analysis succeeded for task {}: star={}",
                         item.task_id,
                         result.star_value
                     );
-                    result
+                    result.reason = format!("🤖 AI: {}", result.reason);
+                    (result, "ai", None)
                 }
                 Err(e) => {
                     log::warn!(
@@ -100,15 +101,22 @@ impl AnalysisQueue {
                         item.title,
                         e
                     );
-                    local_rules::evaluate(&item.title, &item.description, item.due_at.as_deref())
+                    let mut local = local_rules::evaluate(&item.title, &item.description, item.due_at.as_deref());
+                    local.reason = format!("📋 本地 (AI异常: {}): {}", 
+                        if e.len() > 60 { format!("{}...", &e[..60]) } else { e.clone() },
+                        local.reason
+                    );
+                    (local, "local", Some(e))
                 }
             }
         } else {
             log::info!(
-                "AI not available, using local rules for task '{}'",
+                "AI not available (no API key), using local rules for task '{}'",
                 item.title
             );
-            local_rules::evaluate(&item.title, &item.description, item.due_at.as_deref())
+            let mut local = local_rules::evaluate(&item.title, &item.description, item.due_at.as_deref());
+            local.reason = format!("📋 本地 (未配置API Key): {}", local.reason);
+            (local, "local", None)
         };
 
         // Save result to database
@@ -137,9 +145,10 @@ impl AnalysisQueue {
                 );
             } else {
                 log::info!(
-                    "DB updated for task {}: star={}, reason='{}'",
+                    "DB updated for task {}: star={}, source={}, reason='{}'",
                     item.task_id,
                     ai_result.star_value,
+                    ai_source,
                     ai_result.reason
                 );
             }
@@ -147,12 +156,16 @@ impl AnalysisQueue {
             log::error!("DbConnection state not found — cannot save AI result for task {}", item.task_id);
         }
 
-        // Emit event so frontend refreshes
-        let payload = serde_json::json!({
+        // Emit event with source info so frontend can display it
+        let mut payload = serde_json::json!({
             "task_id": item.task_id,
             "star_value": ai_result.star_value,
             "star_reason": ai_result.reason,
+            "ai_source": ai_source,
         });
+        if let Some(ref err) = ai_error {
+            payload["ai_error"] = serde_json::json!(err);
+        }
         if let Err(e) = app_handle.emit("task:analyzed", payload) {
             log::error!("Failed to emit task:analyzed event: {}", e);
         }

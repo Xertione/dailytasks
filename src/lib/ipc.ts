@@ -121,8 +121,19 @@ export async function analyzeTaskManually(
   return invoke('analyze_task_manually', { taskId, title, description })
 }
 
-export async function getAiStatus(): Promise<string> {
+export async function getAiStatus(): Promise<AiStatus> {
   return invoke('get_ai_status')
+}
+
+export interface AiStatus {
+  has_key: boolean
+  key_preview: string
+  key_length: number
+  model: string
+  base_url: string
+  status: 'ready' | 'offline' | 'error'
+  api_test?: 'ok' | 'fail'
+  api_test_msg?: string
 }
 
 // ============================================
