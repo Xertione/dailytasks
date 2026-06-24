@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { ClipboardPaste, Sparkles } from 'lucide-react'
-import { isFirstRun, saveApiKey } from '@/lib/ipc'
+import { saveApiKey } from '@/lib/ipc'
 
 interface OnboardingViewProps {
   onComplete: () => void
