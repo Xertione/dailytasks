@@ -12,32 +12,29 @@ import { HistoryView } from '@/components/HistoryView'
 import { SettingsDialog } from '@/components/SettingsDialog'
 import { Toast } from '@/components/Toast'
 import { OnboardingView } from '@/components/OnboardingView'
-import { isFirstRun } from '@/lib/ipc'
+import { AppErrorBoundary } from '@/components/AppErrorBoundary'
 
 type Tab = 'tasks' | 'pomodoro' | 'history' | 'chat'
 
 function App() {
   const [tab, setTab] = useState<Tab>('tasks')
   const { toggleSettings } = useUiStore()
-  const [showOnboarding, setShowOnboarding] = useState<boolean | null>(null)
 
-  useEffect(() => {
-    // Wait a tick for Tauri IPC bridge to initialize
-    const timer = setTimeout(() => {
-      isFirstRun()
-        .then(first => setShowOnboarding(first))
-        .catch(() => setShowOnboarding(false))
-    }, 200)
-    return () => clearTimeout(timer)
-  }, [])
+  // Use localStorage flag instead of IPC to avoid bridge timing issues
+  const configured = typeof window !== 'undefined'
+    && localStorage.getItem('daily-tasks-api-key') === 'true'
 
-  // Show nothing while checking — prevents black screen flicker
-  if (showOnboarding === null) {
-    return <div className="h-screen bg-surface-0" />
-  }
+  const [showOnboarding, setShowOnboarding] = useState(!configured)
 
   if (showOnboarding) {
-    return <OnboardingView onComplete={() => setShowOnboarding(false)} />
+    return (
+      <AppErrorBoundary>
+        <OnboardingView onComplete={() => {
+          localStorage.setItem('daily-tasks-api-key', 'true')
+          setShowOnboarding(false)
+        }} />
+      </AppErrorBoundary>
+    )
   }
 
   useTaskAnalyzedEvent()
@@ -58,6 +55,7 @@ function App() {
   )
 
   return (
+    <AppErrorBoundary>
     <div className="h-screen flex flex-col bg-surface-0">
       {/* Header */}
       <header className="flex items-center justify-between px-4 py-3 shrink-0" data-tauri-drag-region>
@@ -87,6 +85,7 @@ function App() {
       <SettingsDialog />
       <Toast />
     </div>
+    </AppErrorBoundary>
   )
 }
 
