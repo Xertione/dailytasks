@@ -1,19 +1,12 @@
 import { useState, useRef, useEffect } from 'react'
-import { Trash2, Check, Clock, Bell } from 'lucide-react'
+import { Trash2, Check, Clock, FileText } from 'lucide-react'
 import { format, isPast, isToday } from 'date-fns'
 import { cn } from '@/lib/utils'
 import type { Task } from '@/lib/ipc'
-import { useUpdateTask, useUpdateProgress, useDeleteTask, useCompleteTask, useSetCountdown, useCompleteWithNote } from '@/hooks/useTasks'
+import { useUpdateTask, useUpdateProgress, useDeleteTask, useCompleteWithNote } from '@/hooks/useTasks'
 import { updateStarRating } from '@/lib/ipc'
 import { StarBadge } from './StarBadge'
 import { CompletionDialog } from './CompletionDialog'
-
-const COUNTDOWN_PRESETS = [
-  { label: '1min', secs: 60 },
-  { label: '5min', secs: 300 },
-  { label: '15min', secs: 900 },
-  { label: '25min', secs: 1500 },
-]
 
 function formatCountdown(totalSeconds: number): string {
   const m = Math.floor(totalSeconds / 60)
@@ -27,7 +20,6 @@ interface TaskCardProps {
 
 export function TaskCard({ task }: TaskCardProps) {
   const [showStarPicker, setShowStarPicker] = useState(false)
-  const [showCountdownPicker, setShowCountdownPicker] = useState(false)
   const [showCompletionDialog, setShowCompletionDialog] = useState(false)
   const [countdownRemaining, setCountdownRemaining] = useState(0)
   const [countdownFlash, setCountdownFlash] = useState(false)
@@ -36,8 +28,6 @@ export function TaskCard({ task }: TaskCardProps) {
   const updateTask = useUpdateTask()
   const updateProgress = useUpdateProgress()
   const deleteTask = useDeleteTask()
-  const completeTask = useCompleteTask()
-  const setCountdown = useSetCountdown()
   const completeWithNote = useCompleteWithNote()
 
   const isDone = task.status === 'done'
@@ -86,58 +76,27 @@ export function TaskCard({ task }: TaskCardProps) {
     return () => document.removeEventListener('click', handler)
   }, [showStarPicker])
 
-  // Close countdown picker when clicking outside
-  useEffect(() => {
-    if (!showCountdownPicker) return
-    const handler = (e: MouseEvent) => {
-      const target = e.target as HTMLElement
-      if (!target.closest('[data-countdown-picker]')) {
-        setShowCountdownPicker(false)
-      }
-    }
-    document.addEventListener('click', handler)
-    return () => document.removeEventListener('click', handler)
-  }, [showCountdownPicker])
-
   const handleStatusClick = () => {
     if (isDone) return
-    // When at 100% progress, open completion dialog
-    if (task.progress >= 100 && task.status === 'in_progress') {
-      setShowCompletionDialog(true)
-      return
-    }
-    // Normal status toggle: pending → in_progress
     handleStatusChange()
   }
 
   const handleStatusChange = async () => {
     try {
-      let nextStatus: string, nextProgress: number
       if (task.status === 'pending') {
-        nextStatus = 'in_progress'
-        nextProgress = 25
+        await updateTask.mutateAsync({
+          id: task.id,
+          title: task.title,
+          description: task.description,
+          status: 'in_progress',
+          progress: 25,
+          star_value: task.star_value,
+          due_at: task.due_at,
+          remind_at: task.remind_at,
+        })
       } else if (task.status === 'in_progress') {
-        // When completing with partial progress, scale stars via complete_task_with_progress
-        if (task.progress < 100) {
-          await completeTask.mutateAsync(task.id)
-          return
-        }
-        nextStatus = 'done'
-        nextProgress = 100
-      } else {
-        return // done stays done
+        await completeWithNote.mutateAsync({ id: task.id, note: '' })
       }
-
-      await updateTask.mutateAsync({
-        id: task.id,
-        title: task.title,
-        description: task.description,
-        status: nextStatus,
-        progress: nextProgress,
-        star_value: task.star_value,
-        due_at: task.due_at,
-        remind_at: task.remind_at,
-      })
     } catch (err) {
       console.error('Status change failed:', err)
     }
@@ -146,22 +105,13 @@ export function TaskCard({ task }: TaskCardProps) {
   const handleCompletionDialogComplete = async (note: string) => {
     setShowCompletionDialog(false)
     try {
-      if (note) {
-        await completeWithNote.mutateAsync({ id: task.id, note })
-      } else {
-        await completeTask.mutateAsync(task.id)
-      }
+      await completeWithNote.mutateAsync({ id: task.id, note })
     } catch (err) {
       console.error('Complete failed:', err)
     }
   }
 
   const handleProgressChange = async (pct: number) => {
-    if (pct >= 100) {
-      // Open completion dialog when completing
-      setShowCompletionDialog(true)
-      return
-    }
     await updateProgress.mutateAsync({ id: task.id, progress: pct })
   }
 
@@ -179,18 +129,6 @@ export function TaskCard({ task }: TaskCardProps) {
     window.dispatchEvent(new CustomEvent('show-toast', {
       detail: { message: '任务已删除', action: 'undo', taskId: task.id, taskTitle: task.title },
     }))
-  }
-
-  const handleSetCountdown = async (secs: number) => {
-    setShowCountdownPicker(false)
-    if (secs === 0) {
-      // Close - reset to 0
-      setCountdownRemaining(0)
-      await setCountdown.mutateAsync({ id: task.id, countdownSecs: 0 })
-    } else {
-      setCountdownRemaining(secs)
-      await setCountdown.mutateAsync({ id: task.id, countdownSecs: secs })
-    }
   }
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -254,59 +192,6 @@ export function TaskCard({ task }: TaskCardProps) {
               >
                 {task.title}
               </p>
-
-              {/* Countdown bell icon */}
-              {!isDone && (
-                <div className="relative" data-countdown-picker>
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      setShowCountdownPicker(!showCountdownPicker)
-                    }}
-                    className={cn(
-                      'p-0.5 rounded transition-colors',
-                      (task.countdown_secs || 0) > 0
-                        ? 'text-amber-400 hover:text-amber-300'
-                        : 'text-text-disabled hover:text-text-secondary opacity-0 group-hover:opacity-100',
-                    )}
-                    title="设置倒计时"
-                  >
-                    <Bell size={12} />
-                  </button>
-
-                  {showCountdownPicker && (
-                    <div className="absolute top-full right-0 mt-1 bg-surface-1 border border-surface-3 rounded-md p-1.5 z-10 shadow-elevated animate-scale-in">
-                      <div className="flex flex-col gap-0.5">
-                        {COUNTDOWN_PRESETS.map((preset) => (
-                          <button
-                            key={preset.secs}
-                            type="button"
-                            onClick={() => handleSetCountdown(preset.secs)}
-                            className={cn(
-                              'px-3 py-1 rounded text-xs text-left whitespace-nowrap transition-colors',
-                              'hover:bg-surface-2',
-                              task.countdown_secs === preset.secs
-                                ? 'text-amber-400 bg-amber-500/10'
-                                : 'text-text-secondary',
-                            )}
-                          >
-                            {preset.label}
-                          </button>
-                        ))}
-                        <div className="border-t border-surface-3 my-0.5" />
-                        <button
-                          type="button"
-                          onClick={() => handleSetCountdown(0)}
-                          className="px-3 py-1 rounded text-xs text-left text-text-tertiary hover:bg-surface-2 transition-colors"
-                        >
-                          关闭
-                        </button>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              )}
             </div>
 
             {/* Countdown display */}
@@ -326,7 +211,7 @@ export function TaskCard({ task }: TaskCardProps) {
             {/* Meta row */}
             <div className="flex items-center gap-2 mt-1.5 flex-wrap">
               {/* Star badge */}
-              <div className="relative" data-star-picker>
+              <div className="relative z-50" data-star-picker>
                 <StarBadge
                   rating={task.star_value}
                   reason={task.star_reason}
@@ -334,7 +219,7 @@ export function TaskCard({ task }: TaskCardProps) {
                 />
 
                 {showStarPicker && (
-                  <div className="absolute top-full left-0 mt-1 bg-surface-1 border border-surface-3 rounded-md p-1.5 z-10 shadow-elevated animate-scale-in">
+                  <div className="absolute top-full left-0 mt-1 bg-surface-1 border border-surface-3 rounded-md p-1.5 z-10 shadow-elevated animate-scale-in" style={{ zIndex: 100 }}>
                     {/* Row 1: 1-5 */}
                     <div className="flex gap-1 mb-1">
                       {[1, 2, 3, 4, 5].map((r) => (
@@ -416,6 +301,14 @@ export function TaskCard({ task }: TaskCardProps) {
                   />
                 ))}
                 <span className="text-[10px] text-text-secondary ml-1 tabular-nums">{task.progress}%</span>
+                <button
+                  type="button"
+                  onClick={() => setShowCompletionDialog(true)}
+                  className="p-0.5 rounded text-text-disabled hover:text-accent-400 hover:bg-surface-2 transition-colors opacity-0 group-hover:opacity-100"
+                  title="添加完成笔记"
+                >
+                  <FileText size={11} />
+                </button>
               </div>
             )}
           </div>
