@@ -4,6 +4,9 @@ import tailwindcss from '@tailwindcss/vite'
 import path from 'path'
 
 export default defineConfig({
+  // Use relative paths for Tauri production builds
+  // https://v2.tauri.app/start/frontend/vite/
+  base: './',
   plugins: [react(), tailwindcss()],
   resolve: {
     alias: {

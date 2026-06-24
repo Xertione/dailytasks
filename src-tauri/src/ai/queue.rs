@@ -1,6 +1,5 @@
 use crate::ai::deepseek::DeepSeekProvider;
 use crate::ai::local_rules;
-use crate::ai::provider::AiProvider;
 use crate::db::models::AiResult;
 use std::sync::Arc;
 use tauri::{AppHandle, Emitter, Manager};
@@ -27,56 +26,68 @@ impl AnalysisQueue {
             let provider = Arc::new(DeepSeekProvider::new());
 
             while let Some(item) = rx.recv().await {
-                let result = if provider.is_available() {
-                    Self::analyze_with_retry(&provider, &item.title, &item.description).await
+                // Try AI first if available, always fall back to local rules on failure
+                let ai_result = if provider.is_available() {
+                    match Self::analyze_with_retry(&provider, &item.title, &item.description).await
+                    {
+                        Ok(result) => result,
+                        Err(e) => {
+                            log::warn!(
+                                "AI analysis failed for task {}, using local rules: {}",
+                                item.task_id,
+                                e
+                            );
+                            local_rules::evaluate(
+                                &item.title,
+                                &item.description,
+                                item.due_at.as_deref(),
+                            )
+                        }
+                    }
                 } else {
-                    Ok(local_rules::evaluate(
+                    log::info!(
+                        "AI not available, using local rules for task {}",
+                        item.task_id
+                    );
+                    local_rules::evaluate(
                         &item.title,
                         &item.description,
                         item.due_at.as_deref(),
-                    ))
+                    )
                 };
 
-                match result {
-                    Ok(ai_result) => {
-                        // Save result to database
-                        if let Some(db) = app_handle.try_state::<DbConnection>() {
-                            let conn = db.lock();
-                            let now = chrono::Utc::now()
-                                .format("%Y-%m-%dT%H:%M:%S%.3fZ")
-                                .to_string();
-                            let _ = conn.execute(
-                                "UPDATE tasks SET star_value=?1, value_score=?2, urgency=?3, potential=?4, star_reason=?5, estimated_min=?6, updated_at=?7 WHERE id=?8",
-                                rusqlite::params![
-                                    ai_result.star_value,
-                                    ai_result.value_score,
-                                    ai_result.urgency,
-                                    ai_result.potential,
-                                    ai_result.reason,
-                                    ai_result.estimated_minutes,
-                                    now,
-                                    item.task_id,
-                                ],
-                            );
-                        }
-
-                        // Emit event to frontend
-                        let payload = serde_json::json!({
-                            "task_id": item.task_id,
-                            "star_value": ai_result.star_value,
-                            "star_reason": ai_result.reason,
-                        });
-                        let _ = app_handle.emit("task:analyzed", payload);
+                // Always save result to database (success or fallback)
+                if let Some(db) = app_handle.try_state::<DbConnection>() {
+                    let conn = db.lock();
+                    let now = chrono::Utc::now()
+                        .format("%Y-%m-%dT%H:%M:%S%.3fZ")
+                        .to_string();
+                    if let Err(e) = conn.execute(
+                        "UPDATE tasks SET star_value=?1, value_score=?2, urgency=?3, potential=?4, star_reason=?5, estimated_min=?6, updated_at=?7 WHERE id=?8",
+                        rusqlite::params![
+                            ai_result.star_value,
+                            ai_result.value_score,
+                            ai_result.urgency,
+                            ai_result.potential,
+                            ai_result.reason,
+                            ai_result.estimated_minutes,
+                            now,
+                            item.task_id,
+                        ],
+                    ) {
+                        log::error!("Failed to update task {} in DB: {}", item.task_id, e);
                     }
-                    Err(e) => {
-                        log::warn!("AI analysis error for task {}: {}", item.task_id, e);
-                        let payload = serde_json::json!({
-                            "task_id": item.task_id,
-                            "error": e,
-                        });
-                        let _ = app_handle.emit("task:analyzed", payload);
-                    }
+                } else {
+                    log::error!("DbConnection state not found in queue worker");
                 }
+
+                // Always emit event so frontend refreshes
+                let payload = serde_json::json!({
+                    "task_id": item.task_id,
+                    "star_value": ai_result.star_value,
+                    "star_reason": ai_result.reason,
+                });
+                let _ = app_handle.emit("task:analyzed", payload);
             }
         });
 
@@ -92,7 +103,7 @@ impl AnalysisQueue {
         let mut last_error = String::new();
 
         for attempt in 0..=max_retries {
-            match provider.analyze(title, description) {
+            match provider.analyze_async(title, description).await {
                 Ok(result) => return Ok(result),
                 Err(e) => {
                     last_error = e;

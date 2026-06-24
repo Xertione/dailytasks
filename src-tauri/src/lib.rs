@@ -1,4 +1,5 @@
 use std::sync::Mutex;
+use tauri::Emitter;
 
 pub mod ai;
 pub mod commands;
@@ -80,18 +81,24 @@ pub fn run() {
                 let mut tray_builder = TrayIconBuilder::new()
                     .menu(&menu)
                     .on_menu_event(move |app, event| {
-                        use tauri::Emitter;
+                        let event_id = event.id().as_ref().to_string();
+                        log::info!("Tray menu event: {}", event_id);
                         match event.id().as_ref() {
                             "quick_add" => {
+                                log::info!("Emitting app:quick-add");
                                 let _ = app.emit("app:quick-add", ());
                             }
                             "today_progress" => {
+                                log::info!("Emitting app:show-progress");
                                 let _ = app.emit("app:show-progress", ());
                             }
                             "quit" => {
+                                log::info!("Quitting application");
                                 app.exit(0);
                             }
-                            _ => {}
+                            _ => {
+                                log::warn!("Unknown menu event: {}", event_id);
+                            }
                         }
                     })
                     .on_tray_icon_event(move |_tray, event| {
@@ -124,7 +131,11 @@ pub fn run() {
                     tray_builder = tray_builder.icon(icon);
                 }
 
-                let _tray = tray_builder.build(app)?;
+                let tray = tray_builder.build(app)?;
+                log::info!("Tray icon created successfully");
+                // Prevent TrayIcon from being dropped (keep alive for app lifetime)
+                #[allow(clippy::mem_forget)]
+                std::mem::forget(tray);
             }
 
             // 6. Handle window close → hide to tray

@@ -90,7 +90,9 @@ export function TaskList({ tasks, isLoading }: TaskListProps) {
                 : 'grid-rows-[1fr] opacity-100',
             )}
           >
-            <div className="overflow-hidden">
+            <div className={cn(
+              collapsed[group.key] ? 'overflow-hidden' : '',
+            )}>
               <div className="space-y-1.5">
                 {group.items.map((task) => (
                   <TaskCard key={task.id} task={task} />

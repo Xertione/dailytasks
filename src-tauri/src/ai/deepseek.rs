@@ -1,4 +1,3 @@
-use crate::ai::provider::AiProvider;
 use crate::ai::prompt;
 use crate::config::get_config;
 use crate::db::models::AiResult;
@@ -17,36 +16,29 @@ impl DeepSeekProvider {
         let config = get_config();
         let api_key = std::env::var("DEEPSEEK_API_KEY").unwrap_or_default();
 
+        let client = Client::builder()
+            .timeout(std::time::Duration::from_secs(config.ai.timeout_secs as u64))
+            .build()
+            .unwrap_or_default();
+
         Self {
-            client: Client::new(),
+            client,
             api_key,
             base_url: config.ai.base_url.clone(),
             model: config.ai.model.clone(),
         }
     }
-}
 
-impl AiProvider for DeepSeekProvider {
-    fn analyze(&self, title: &str, description: &str) -> Result<AiResult, String> {
-        // Use the current runtime handle instead of creating a new Runtime
-        // to avoid "cannot start a runtime from within a runtime" panic
-        match tokio::runtime::Handle::try_current() {
-            Ok(handle) => handle.block_on(self.analyze_async(title, description)),
-            Err(_) => {
-                // No tokio runtime active — create a temporary one
-                let rt = tokio::runtime::Runtime::new().map_err(|e| e.to_string())?;
-                rt.block_on(self.analyze_async(title, description))
-            }
-        }
-    }
-
-    fn is_available(&self) -> bool {
+    pub fn is_available(&self) -> bool {
         !self.api_key.is_empty()
     }
-}
 
-impl DeepSeekProvider {
-    async fn analyze_async(&self, title: &str, description: &str) -> Result<AiResult, String> {
+    /// Direct async analysis — call this from tokio contexts
+    pub async fn analyze_async(
+        &self,
+        title: &str,
+        description: &str,
+    ) -> Result<AiResult, String> {
         let messages = prompt::build_messages(title, description);
         let config = get_config();
 
@@ -70,13 +62,23 @@ impl DeepSeekProvider {
             .map_err(|e| format!("AI request failed: {}", e))?;
 
         let status = response.status();
-        let text = response.text().await.map_err(|e| format!("Read response: {}", e))?;
+        let text = response
+            .text()
+            .await
+            .map_err(|e| format!("Read response: {}", e))?;
 
         if !status.is_success() {
-            return Err(format!("AI API error ({}): {}", status.as_u16(), text));
+            return Err(format!(
+                "AI API error ({}): {}",
+                status.as_u16(),
+                if text.len() > 200 {
+                    &text[..200]
+                } else {
+                    &text
+                }
+            ));
         }
 
-        // Parse the response
         let parsed: Value =
             serde_json::from_str(&text).map_err(|e| format!("Parse response: {}", e))?;
 
@@ -97,7 +99,6 @@ fn extract_ai_result(content: &str) -> Result<AiResult, String> {
     // Try to extract first { ... } block
     let trimmed = content.trim();
     if let Some(start) = trimmed.find('{') {
-        // Find matching closing brace
         let mut depth = 0;
         let mut end = 0;
         for (i, ch) in trimmed[start..].char_indices() {
@@ -115,15 +116,18 @@ fn extract_ai_result(content: &str) -> Result<AiResult, String> {
         if end > start {
             let json_block = &trimmed[start..end];
             if let Ok(result) = serde_json::from_str::<Value>(json_block) {
-                let ai_result = AiResult {
+                return Ok(AiResult {
                     star_value: result["star_value"].as_i64().unwrap_or(1) as i32,
                     value_score: result["value_score"].as_i64().unwrap_or(1) as i32,
                     urgency: result["urgency"].as_i64().unwrap_or(1) as i32,
                     potential: result["potential"].as_i64().unwrap_or(1) as i32,
-                    reason: result["reason"].as_str().unwrap_or("").to_string(),
-                    estimated_minutes: result["estimated_minutes"].as_i64().unwrap_or(30) as i32,
-                };
-                return Ok(ai_result);
+                    reason: result["reason"]
+                        .as_str()
+                        .unwrap_or("")
+                        .to_string(),
+                    estimated_minutes: result["estimated_minutes"].as_i64().unwrap_or(30)
+                        as i32,
+                });
             }
         }
     }
