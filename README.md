@@ -15,11 +15,11 @@
 
 | 层 | 技术 |
 |---|------|
-| 桌面框架 | Tauri 2.0 (Rust + WebView2) |
+| 桌面框架 | Tauri 2.0 (Rust + 系统 WebView) |
 | 前端 | React 19 + TypeScript + Tailwind CSS v4 |
 | 数据 | SQLite (嵌入式) |
 | AI | DeepSeek API (OpenAI 兼容) |
-| 打包 | Windows MSI/NSIS |
+| 平台 | Windows 10+ / Linux |
 
 ## 快速开始
 
@@ -27,27 +27,38 @@
 
 - [Rust](https://rustup.rs/) >= 1.77
 - [Node.js](https://nodejs.org/) >= 22
-- Windows 10+ (内置 WebView2)
 
-### 安装运行
+### Windows
 
 ```bash
 # 1. 克隆项目
-git clone <repo-url> daily-tasks
-cd daily-tasks
+git clone https://github.com/Xertione/dailytasks.git
+cd dailytasks
 
 # 2. 安装前端依赖
 npm install
 
 # 3. 配置 API Key
 cp .env.example .env
-# 编辑 .env 填入你的 DeepSeek API Key
+# 编辑 .env，填入你的 DeepSeek API Key
 
 # 4. 开发模式运行
 npm run tauri dev
+```
 
-# 5. 构建发布包
-npm run tauri build
+### Linux (Ubuntu/Debian)
+
+```bash
+# 先安装系统依赖
+sudo apt update
+sudo apt install libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf libssl-dev
+
+# 然后同上
+git clone https://github.com/Xertione/dailytasks.git
+cd dailytasks
+npm install
+cp .env.example .env
+npm run tauri dev
 ```
 
 ### 配置 API Key
