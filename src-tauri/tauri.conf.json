@@ -22,10 +22,6 @@
         "skipTaskbar": false
       }
     ],
-    "trayIcon": {
-      "id": "daily-tasks-tray",
-      "iconPath": "icons/32x32.png"
-    },
     "security": {
       "csp": null
     }
