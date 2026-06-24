@@ -1,9 +1,14 @@
 import { useState, useRef, useEffect } from 'react'
-import { Send } from 'lucide-react'
+import { Send, Trash2 } from 'lucide-react'
 import { chatWithAi, type ChatMessage } from '@/lib/ipc'
 
 export function ChatView() {
-  const [messages, setMessages] = useState<ChatMessage[]>([])
+  const [messages, setMessages] = useState<ChatMessage[]>(() => {
+    try {
+      const saved = localStorage.getItem('daily-tasks-chat')
+      return saved ? JSON.parse(saved) : []
+    } catch { return [] }
+  })
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
   const scrollRef = useRef<HTMLDivElement>(null)
@@ -11,6 +16,15 @@ export function ChatView() {
   useEffect(() => {
     if (scrollRef.current) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight
+    }
+  }, [messages])
+
+  // Persist chat history
+  useEffect(() => {
+    if (messages.length > 0) {
+      // Only save actual messages (skip "..." placeholder)
+      const real = messages.filter(m => m.content !== '...')
+      localStorage.setItem('daily-tasks-chat', JSON.stringify(real))
     }
   }, [messages])
 
@@ -48,8 +62,20 @@ export function ChatView() {
   return (
     <div className="flex flex-col h-full">
       {/* Header */}
-      <div className="shrink-0 px-4 py-3 border-b border-surface-3">
+      <div className="shrink-0 px-4 py-3 border-b border-surface-3 flex items-center justify-between">
         <h2 className="text-sm font-semibold text-text-primary">AI 教练</h2>
+        {messages.length > 0 && (
+          <button
+            onClick={() => {
+              setMessages([])
+              localStorage.removeItem('daily-tasks-chat')
+            }}
+            className="p-1 rounded text-text-disabled hover:text-danger transition-colors"
+            title="清除历史"
+          >
+            <Trash2 size={14} />
+          </button>
+        )}
       </div>
 
       {/* Messages */}

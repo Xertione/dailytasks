@@ -226,7 +226,7 @@ export function TaskCard({ task }: TaskCardProps) {
             {/* Meta row */}
             <div className="flex items-center gap-2 mt-1.5 flex-wrap">
               {/* Star badge */}
-              <div className="relative z-50" data-star-picker>
+              <div className="relative z-40" data-star-picker>
                 <StarBadge
                   rating={task.star_value}
                   reason={task.star_reason}
