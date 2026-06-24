@@ -40,7 +40,15 @@ impl DeepSeekProvider {
     }
 
     pub fn is_available(&self) -> bool {
-        !self.effective_key().is_empty()
+        let key_exists = !self.effective_key().is_empty();
+        if !key_exists {
+            log::info!("DeepSeekProvider: no API key available (env+DEEPSEEK_API_KEY not set)");
+        }
+        key_exists
+    }
+
+    pub fn model_name(&self) -> &str {
+        &self.model
     }
 
     /// Direct async analysis — call this from tokio contexts
@@ -60,16 +68,32 @@ impl DeepSeekProvider {
         });
 
         let url = format!("{}/v1/chat/completions", self.base_url);
+        let key = self.effective_key();
+        let key_prefix = if key.len() > 8 {
+            format!("{}...", &key[..8])
+        } else {
+            "(empty)".to_string()
+        };
+        log::info!(
+            "DeepSeek API request: url={}, model={}, key_prefix={}, title='{}'",
+            url,
+            self.model,
+            key_prefix,
+            title
+        );
 
         let response = self
             .client
             .post(&url)
-            .header("Authorization", format!("Bearer {}", self.effective_key()))
+            .header("Authorization", format!("Bearer {}", key))
             .header("Content-Type", "application/json")
             .json(&body)
             .send()
             .await
-            .map_err(|e| format!("AI request failed: {}", e))?;
+            .map_err(|e| {
+                log::error!("DeepSeek API request failed: {}", e);
+                format!("AI request failed: {}", e)
+            })?;
 
         let status = response.status();
         let text = response
@@ -78,6 +102,11 @@ impl DeepSeekProvider {
             .map_err(|e| format!("Read response: {}", e))?;
 
         if !status.is_success() {
+            log::error!(
+                "DeepSeek API error {}: {}",
+                status.as_u16(),
+                if text.len() > 300 { &text[..300] } else { &text }
+            );
             return Err(format!(
                 "AI API error ({}): {}",
                 status.as_u16(),
@@ -89,6 +118,11 @@ impl DeepSeekProvider {
             ));
         }
 
+        log::info!(
+            "DeepSeek API response OK: {} bytes",
+            text.len()
+        );
+
         let parsed: Value =
             serde_json::from_str(&text).map_err(|e| format!("Parse response: {}", e))?;
 
@@ -96,6 +130,7 @@ impl DeepSeekProvider {
             .as_str()
             .ok_or_else(|| "No content in AI response".to_string())?;
 
+        log::info!("DeepSeek AI raw content: {}", if content.len() > 200 { &content[..200] } else { content });
         extract_ai_result(content)
     }
 }
@@ -106,7 +141,7 @@ fn extract_ai_result(content: &str) -> Result<AiResult, String> {
         return Ok(result);
     }
 
-    // Try to extract first { ... } block
+    // Try to extract first { ... } block (handles markdown code blocks etc.)
     let trimmed = content.trim();
     if let Some(start) = trimmed.find('{') {
         let mut depth = 0;
@@ -142,14 +177,7 @@ fn extract_ai_result(content: &str) -> Result<AiResult, String> {
         }
     }
 
-    // Fallback: return default values
-    log::warn!("Failed to parse AI response, using defaults");
-    Ok(AiResult {
-        star_value: 5,
-        value_score: 5,
-        urgency: 5,
-        potential: 5,
-        reason: "无法解析 AI 返回结果".to_string(),
-        estimated_minutes: 45,
-    })
+    // Could not parse any JSON — return error so caller can fall back to local_rules
+    log::warn!("Failed to extract JSON from AI response: {}", if content.len() > 200 { &content[..200] } else { content });
+    Err("无法解析 AI 返回的 JSON".to_string())
 }

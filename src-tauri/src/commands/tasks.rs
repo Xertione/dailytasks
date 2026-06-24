@@ -1,4 +1,5 @@
 use crate::ai::queue::AnalysisQueue;
+use crate::ai::local_rules;
 use crate::db::models::{DailyStats, Task};
 use crate::DbConnection;
 use tauri::State;
@@ -17,18 +18,25 @@ pub fn add_task(
         .format("%Y-%m-%dT%H:%M:%S%.3fZ")
         .to_string();
 
+    // Apply local_rules immediately for instant feedback — AI can refine later
+    let local = local_rules::evaluate(&title, &description, due_at.as_deref());
+    log::info!(
+        "add_task: local_rules → star={} (v={}, u={}, p={}) for '{}'",
+        local.star_value, local.value_score, local.urgency, local.potential, title
+    );
+
     let task = Task {
         id: id.clone(),
         title: title.clone(),
         description: description.clone(),
         status: "pending".to_string(),
         progress: 0,
-        star_value: 0,
-        star_reason: String::new(),
-        urgency: 0,
-        value_score: 0,
-        potential: 0,
-        estimated_min: 0,
+        star_value: local.star_value,
+        star_reason: local.reason.clone(),
+        urgency: local.urgency,
+        value_score: local.value_score,
+        potential: local.potential,
+        estimated_min: local.estimated_minutes,
         due_at: due_at.clone(),
         remind_at: remind_at.clone(),
         created_at: now.clone(),
@@ -52,8 +60,8 @@ pub fn add_task(
     )
     .map_err(|e| e.to_string())?;
 
-    // Enqueue for AI analysis (sync — UnboundedSender::send is non-blocking)
-    log::info!("add_task: created task {}, enqueuing for AI analysis", task.id);
+    // Enqueue for AI analysis to refine the rating (sync — UnboundedSender::send is non-blocking)
+    log::info!("add_task: created task {}, enqueuing for AI refinement", task.id);
     let q = (*queue).clone();
     let tid = task.id.clone();
     let ttl = task.title.clone();

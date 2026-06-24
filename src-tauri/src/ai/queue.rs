@@ -1,8 +1,10 @@
 use crate::ai::deepseek::DeepSeekProvider;
 use crate::ai::local_rules;
 use crate::db::models::AiResult;
+use std::panic::AssertUnwindSafe;
 use std::sync::Arc;
 use tauri::{AppHandle, Emitter, Manager};
+use futures::FutureExt;
 
 use crate::DbConnection;
 
@@ -25,75 +27,135 @@ impl AnalysisQueue {
         tauri::async_runtime::spawn(async move {
             log::info!("AI analysis queue worker started");
             let provider = Arc::new(DeepSeekProvider::new());
+            log::info!(
+                "DeepSeekProvider initialized: available={}, model={}",
+                provider.is_available(),
+                provider.model_name()
+            );
 
             while let Some(item) = rx.recv().await {
-                log::info!("AI queue: processing task {}", item.task_id);
-                // Try AI first if available, always fall back to local rules on failure
-                let ai_result = if provider.is_available() {
-                    match Self::analyze_with_retry(&provider, &item.title, &item.description).await
-                    {
-                        Ok(result) => result,
-                        Err(e) => {
-                            log::warn!(
-                                "AI analysis failed for task {}, using local rules: {}",
-                                item.task_id,
-                                e
-                            );
-                            local_rules::evaluate(
-                                &item.title,
-                                &item.description,
-                                item.due_at.as_deref(),
-                            )
-                        }
-                    }
-                } else {
-                    log::info!(
-                        "AI not available, using local rules for task {}",
-                        item.task_id
-                    );
-                    local_rules::evaluate(
-                        &item.title,
-                        &item.description,
-                        item.due_at.as_deref(),
-                    )
+                log::info!(
+                    "AI queue: processing task {} — '{}'",
+                    item.task_id,
+                    item.title
+                );
+
+                // Wrap in catch_unwind so a panic in one task doesn't kill the whole queue
+                let fut = async {
+                    Self::process_item(&app_handle, &provider, &item).await
                 };
+                let result = AssertUnwindSafe(fut).catch_unwind().await;
 
-                // Always save result to database (success or fallback)
-                if let Some(db) = app_handle.try_state::<DbConnection>() {
-                    let conn = db.lock();
-                    let now = chrono::Utc::now()
-                        .format("%Y-%m-%dT%H:%M:%S%.3fZ")
-                        .to_string();
-                    if let Err(e) = conn.execute(
-                        "UPDATE tasks SET star_value=?1, value_score=?2, urgency=?3, potential=?4, star_reason=?5, estimated_min=?6, updated_at=?7 WHERE id=?8",
-                        rusqlite::params![
-                            ai_result.star_value,
-                            ai_result.value_score,
-                            ai_result.urgency,
-                            ai_result.potential,
-                            ai_result.reason,
-                            ai_result.estimated_minutes,
-                            now,
+                match result {
+                    Ok(()) => {}
+                    Err(panic_err) => {
+                        let msg = if let Some(s) = panic_err.downcast_ref::<String>() {
+                            s.clone()
+                        } else if let Some(s) = panic_err.downcast_ref::<&str>() {
+                            s.to_string()
+                        } else {
+                            "unknown panic".to_string()
+                        };
+                        log::error!(
+                            "AI queue worker panicked processing task {}: {}",
                             item.task_id,
-                        ],
-                    ) {
-                        log::error!("Failed to update task {} in DB: {}", item.task_id, e);
+                            msg
+                        );
+                        // Still emit an event so the frontend refreshes
+                        let payload = serde_json::json!({
+                            "task_id": item.task_id,
+                            "star_value": 0,
+                            "star_reason": format!("处理异常: {}", msg),
+                        });
+                        let _ = app_handle.emit("task:analyzed", payload);
                     }
-                } else {
-                    log::error!("DbConnection state not found in queue worker");
                 }
-
-                // Always emit event so frontend refreshes
-                let payload = serde_json::json!({
-                    "task_id": item.task_id,
-                    "star_value": ai_result.star_value,
-                    "star_reason": ai_result.reason,
-                });
-                let _ = app_handle.emit("task:analyzed", payload);
             }
+
+            log::warn!("AI analysis queue worker stopped — channel closed");
         });
 
         Self { tx }
+    }
+
+    async fn process_item(
+        app_handle: &AppHandle,
+        provider: &Arc<DeepSeekProvider>,
+        item: &QueueItem,
+    ) {
+        // Try AI first if available, always fall back to local rules on failure
+        let ai_result = if provider.is_available() {
+            match Self::analyze_with_retry(provider, &item.title, &item.description).await {
+                Ok(result) => {
+                    log::info!(
+                        "AI analysis succeeded for task {}: star={}",
+                        item.task_id,
+                        result.star_value
+                    );
+                    result
+                }
+                Err(e) => {
+                    log::warn!(
+                        "AI analysis failed for task '{}', using local rules: {}",
+                        item.title,
+                        e
+                    );
+                    local_rules::evaluate(&item.title, &item.description, item.due_at.as_deref())
+                }
+            }
+        } else {
+            log::info!(
+                "AI not available, using local rules for task '{}'",
+                item.title
+            );
+            local_rules::evaluate(&item.title, &item.description, item.due_at.as_deref())
+        };
+
+        // Save result to database
+        if let Some(db) = app_handle.try_state::<DbConnection>() {
+            let conn = db.lock();
+            let now = chrono::Utc::now()
+                .format("%Y-%m-%dT%H:%M:%S%.3fZ")
+                .to_string();
+            if let Err(e) = conn.execute(
+                "UPDATE tasks SET star_value=?1, value_score=?2, urgency=?3, potential=?4, star_reason=?5, estimated_min=?6, updated_at=?7 WHERE id=?8",
+                rusqlite::params![
+                    ai_result.star_value,
+                    ai_result.value_score,
+                    ai_result.urgency,
+                    ai_result.potential,
+                    ai_result.reason,
+                    ai_result.estimated_minutes,
+                    now,
+                    item.task_id,
+                ],
+            ) {
+                log::error!(
+                    "Failed to update task {} in DB: {}",
+                    item.task_id,
+                    e
+                );
+            } else {
+                log::info!(
+                    "DB updated for task {}: star={}, reason='{}'",
+                    item.task_id,
+                    ai_result.star_value,
+                    ai_result.reason
+                );
+            }
+        } else {
+            log::error!("DbConnection state not found — cannot save AI result for task {}", item.task_id);
+        }
+
+        // Emit event so frontend refreshes
+        let payload = serde_json::json!({
+            "task_id": item.task_id,
+            "star_value": ai_result.star_value,
+            "star_reason": ai_result.reason,
+        });
+        if let Err(e) = app_handle.emit("task:analyzed", payload) {
+            log::error!("Failed to emit task:analyzed event: {}", e);
+        }
     }
 
     async fn analyze_with_retry(
