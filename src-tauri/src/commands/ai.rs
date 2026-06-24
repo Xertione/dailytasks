@@ -23,9 +23,7 @@ pub async fn analyze_task_manually(
     };
 
     // Enqueue for AI analysis
-    queue
-        .enqueue(task_id.clone(), title.clone(), description.clone(), due_at.clone())
-        .await;
+    queue.enqueue(task_id.clone(), title.clone(), description.clone(), due_at.clone());
 
     // Return an immediate estimate using local rules
     let local_result =

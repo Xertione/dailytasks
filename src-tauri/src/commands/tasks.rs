@@ -49,15 +49,14 @@ pub fn add_task(
     )
     .map_err(|e| e.to_string())?;
 
-    // Enqueue for AI analysis
+    // Enqueue for AI analysis (sync — UnboundedSender::send is non-blocking)
+    log::info!("add_task: created task {}, enqueuing for AI analysis", task.id);
     let q = (*queue).clone();
     let tid = task.id.clone();
     let ttl = task.title.clone();
     let desc = task.description.clone();
     let due = task.due_at.clone();
-    tauri::async_runtime::spawn(async move {
-        q.enqueue(tid, ttl, desc, due).await;
-    });
+    q.enqueue(tid, ttl, desc, due);
 
     Ok(task)
 }

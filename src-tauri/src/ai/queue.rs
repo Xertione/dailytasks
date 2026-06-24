@@ -23,9 +23,11 @@ impl AnalysisQueue {
         let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel::<QueueItem>();
 
         tauri::async_runtime::spawn(async move {
+            log::info!("AI analysis queue worker started");
             let provider = Arc::new(DeepSeekProvider::new());
 
             while let Some(item) = rx.recv().await {
+                log::info!("AI queue: processing task {}", item.task_id);
                 // Try AI first if available, always fall back to local rules on failure
                 let ai_result = if provider.is_available() {
                     match Self::analyze_with_retry(&provider, &item.title, &item.description).await
@@ -125,13 +127,14 @@ impl AnalysisQueue {
         ))
     }
 
-    pub async fn enqueue(
+    pub fn enqueue(
         &self,
         task_id: String,
         title: String,
         description: String,
         due_at: Option<String>,
     ) {
+        log::info!("AI queue: enqueuing task {}", task_id);
         let item = QueueItem {
             task_id,
             title,
