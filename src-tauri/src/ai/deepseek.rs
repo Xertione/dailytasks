@@ -29,8 +29,18 @@ impl DeepSeekProvider {
         }
     }
 
+    /// Get the effective API key — checks stored field first, then env var.
+    /// This allows the save_api_key command (which sets env var at runtime)
+    /// to take effect even after the provider was constructed.
+    fn effective_key(&self) -> String {
+        if !self.api_key.is_empty() {
+            return self.api_key.clone();
+        }
+        std::env::var("DEEPSEEK_API_KEY").unwrap_or_default()
+    }
+
     pub fn is_available(&self) -> bool {
-        !self.api_key.is_empty()
+        !self.effective_key().is_empty()
     }
 
     /// Direct async analysis — call this from tokio contexts
@@ -54,7 +64,7 @@ impl DeepSeekProvider {
         let response = self
             .client
             .post(&url)
-            .header("Authorization", format!("Bearer {}", self.api_key))
+            .header("Authorization", format!("Bearer {}", self.effective_key()))
             .header("Content-Type", "application/json")
             .json(&body)
             .send()

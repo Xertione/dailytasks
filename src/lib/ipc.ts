@@ -145,6 +145,14 @@ export async function setNudgeStyle(style: string): Promise<void> {
   return invoke('set_nudge_style', { style })
 }
 
+export async function isFirstRun(): Promise<boolean> {
+  return invoke('is_first_run')
+}
+
+export async function saveApiKey(apiKey: string): Promise<void> {
+  return invoke('save_api_key', { apiKey })
+}
+
 export async function setCountdown(id: string, countdownSecs: number): Promise<Task> {
   return invoke('set_countdown', { id, countdownSecs })
 }

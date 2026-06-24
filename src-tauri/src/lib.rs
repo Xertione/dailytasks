@@ -190,6 +190,8 @@ pub fn run() {
             commands::settings::set_setting,
             commands::settings::get_nudge_style,
             commands::settings::set_nudge_style,
+            commands::settings::is_first_run,
+            commands::settings::save_api_key,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

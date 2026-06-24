@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import { Settings } from 'lucide-react'
 import { ChatView } from '@/components/ChatView'
 import { useUiStore } from '@/stores/uiStore'
@@ -11,12 +11,23 @@ import { PomodoroView } from '@/components/PomodoroView'
 import { HistoryView } from '@/components/HistoryView'
 import { SettingsDialog } from '@/components/SettingsDialog'
 import { Toast } from '@/components/Toast'
+import { OnboardingView } from '@/components/OnboardingView'
+import { isFirstRun } from '@/lib/ipc'
 
 type Tab = 'tasks' | 'pomodoro' | 'history' | 'chat'
 
 function App() {
   const [tab, setTab] = useState<Tab>('tasks')
   const { toggleSettings } = useUiStore()
+  const [showOnboarding, setShowOnboarding] = useState(true)
+
+  useEffect(() => {
+    isFirstRun().then(first => setShowOnboarding(first))
+  }, [])
+
+  if (showOnboarding) {
+    return <OnboardingView onComplete={() => setShowOnboarding(false)} />
+  }
 
   useTaskAnalyzedEvent()
   useReminderEvent()
