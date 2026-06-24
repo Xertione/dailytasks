@@ -1,7 +1,7 @@
 import { invoke } from '@tauri-apps/api/core'
 
 // ============================================
-// 数据模型（与 Rust 后端 Task 结构一致）
+// 数据模型（Rust 返回的是 snake_case，接口层保持不变）
 // ============================================
 
 export interface Task {
@@ -9,15 +9,15 @@ export interface Task {
   title: string
   description: string
   status: 'pending' | 'in_progress' | 'done' | 'archived'
-  progress: number             // 0-100
-  star_value: number           // 0=未评估, 1~10
-  star_reason: string          // AI 打分理由
-  urgency: number              // 紧急度 1~10
-  value_score: number          // 价值 1~10
-  potential: number            // 潜力 1~10
-  estimated_min: number        // 预估耗时（分钟）
-  due_at: string | null        // 截止时间
-  remind_at: string | null     // 提醒时间
+  progress: number
+  star_value: number
+  star_reason: string
+  urgency: number
+  value_score: number
+  potential: number
+  estimated_min: number
+  due_at: string | null
+  remind_at: string | null
   created_at: string
   updated_at: string
   completed_at: string | null
@@ -28,7 +28,7 @@ export interface DailyStats {
   completed_cnt: number
   total_cnt: number
   high_star_cnt: number
-  total_stars: number  // accumulated stars from done tasks
+  total_stars: number
 }
 
 export interface AiResult {
@@ -41,16 +41,16 @@ export interface AiResult {
 }
 
 // ============================================
-// 任务 CRUD 命令
+// 命令（Tauri 2.0 自动 camelCase 转换参数名）
 // ============================================
 
 export async function addTask(
   title: string,
   description: string = '',
-  due_at: string | null = null,
-  remind_at: string | null = null,
+  dueAt: string | null = null,
+  remindAt: string | null = null,
 ): Promise<Task> {
-  return invoke('add_task', { title, description, due_at, remind_at })
+  return invoke('add_task', { title, description, dueAt, remindAt })
 }
 
 export async function updateTask(
@@ -59,13 +59,13 @@ export async function updateTask(
   description: string,
   status: string,
   progress: number,
-  star_value: number,
-  due_at: string | null,
-  remind_at: string | null,
+  starValue: number,
+  dueAt: string | null,
+  remindAt: string | null,
 ): Promise<Task> {
   return invoke('update_task', {
     id, title, description, status,
-    progress, star_value, due_at, remind_at,
+    progress, starValue, dueAt, remindAt,
   })
 }
 
@@ -91,14 +91,14 @@ export async function getTodayStats(): Promise<DailyStats> {
 
 export async function updateStarRating(
   id: string,
-  star_value: number,
-  value_score: number,
+  starValue: number,
+  valueScore: number,
   urgency: number,
   potential: number,
   reason: string,
 ): Promise<Task> {
   return invoke('update_star_rating', {
-    id, star_value, value_score,
+    id, starValue, valueScore,
     urgency, potential, reason,
   })
 }
@@ -112,11 +112,11 @@ export async function completeTask(id: string): Promise<Task> {
 // ============================================
 
 export async function analyzeTaskManually(
-  task_id: string,
+  taskId: string,
   title: string,
   description: string,
 ): Promise<AiResult> {
-  return invoke('analyze_task_manually', { task_id, title, description })
+  return invoke('analyze_task_manually', { taskId, title, description })
 }
 
 export async function getAiStatus(): Promise<string> {
