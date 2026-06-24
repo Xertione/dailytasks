@@ -160,7 +160,7 @@ pub fn get_today_stats(db: State<'_, DbConnection>) -> Result<DailyStats, String
 
     let high_star_cnt: i32 = conn
         .query_row(
-            "SELECT COUNT(*) FROM tasks WHERE star_value >= 3 AND status != 'archived'",
+            "SELECT COUNT(*) FROM tasks WHERE star_value >= 7 AND status != 'archived'",
             [],
             |row| row.get(0),
         )
@@ -234,6 +234,35 @@ pub fn update_star_rating(
     conn.execute(
         "UPDATE tasks SET star_value=?1, value_score=?2, urgency=?3, potential=?4, star_reason=?5, updated_at=?6 WHERE id=?7",
         rusqlite::params![star_value, value_score, urgency, potential, reason, now, id],
+    )
+    .map_err(|e| e.to_string())?;
+
+    get_task_internal(&conn, &id)
+}
+
+#[tauri::command]
+pub fn complete_task_with_progress(
+    id: String,
+    db: State<'_, DbConnection>,
+) -> Result<Task, String> {
+    let now = chrono::Utc::now()
+        .format("%Y-%m-%dT%H:%M:%S%.3fZ")
+        .to_string();
+    let conn = db.lock();
+
+    // Get current task progress for star scaling
+    let task = get_task_internal(&conn, &id)?;
+
+    // Scale stars by completion progress when partially completed
+    let scaled_star = if task.progress < 100 && task.star_value > 0 {
+        ((task.star_value * task.progress) / 100).max(1).min(10)
+    } else {
+        task.star_value
+    };
+
+    conn.execute(
+        "UPDATE tasks SET status='done', progress=100, star_value=?1, updated_at=?2, completed_at=?3 WHERE id=?4",
+        rusqlite::params![scaled_star, now, now, id],
     )
     .map_err(|e| e.to_string())?;
 

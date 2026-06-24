@@ -10,11 +10,11 @@ export interface Task {
   description: string
   status: 'pending' | 'in_progress' | 'done' | 'archived'
   progress: number             // 0-100
-  star_value: number           // 0=未评估, 1~3
+  star_value: number           // 0=未评估, 1~10
   star_reason: string          // AI 打分理由
-  urgency: number              // 紧急度 1~3
-  value_score: number          // 价值 1~3
-  potential: number            // 潜力 1~3
+  urgency: number              // 紧急度 1~10
+  value_score: number          // 价值 1~10
+  potential: number            // 潜力 1~10
   estimated_min: number        // 预估耗时（分钟）
   due_at: string | null        // 截止时间
   remind_at: string | null     // 提醒时间
@@ -101,6 +101,10 @@ export async function updateStarRating(
     id, star_value, value_score,
     urgency, potential, reason,
   })
+}
+
+export async function completeTask(id: string): Promise<Task> {
+  return invoke('complete_task_with_progress', { id })
 }
 
 // ============================================

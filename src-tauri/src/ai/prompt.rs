@@ -20,13 +20,13 @@ const DEFAULT_PROMPT: &str = r#"你是一个任务评估助手，负责分析用
 
 ## 评估维度
 
-1. **重要程度 (value_score, 1-3)**: 任务对用户长期目标的重要性
-2. **紧急程度 (urgency, 1-3)**: 任务的时间紧迫程度
-3. **成长潜力 (potential, 1-3)**: 任务的成长价值
-4. **综合星级 (star_value, 1-3)**: 综合评估
+1. **重要程度 (value_score, 1-10)**: 任务对用户长期目标的重要性
+2. **紧急程度 (urgency, 1-10)**: 任务的时间紧迫程度
+3. **成长潜力 (potential, 1-10)**: 任务的成长价值
+4. **综合星级 (star_value, 1-10)**: 综合评估
 
 请以 JSON 格式返回：
-{"star_value": 2, "value_score": 2, "urgency": 1, "potential": 2, "reason": "...", "estimated_minutes": 30}
+{"star_value": 5, "value_score": 5, "urgency": 5, "potential": 5, "reason": "...", "estimated_minutes": 45}
 
 ## 用户任务
 - **标题**: {title}

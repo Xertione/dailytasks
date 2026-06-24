@@ -1,9 +1,9 @@
 import { useState } from 'react'
-import { Trash2, Check, Star, Clock } from 'lucide-react'
+import { Trash2, Check, Clock } from 'lucide-react'
 import { format, isPast, isToday } from 'date-fns'
 import { cn } from '@/lib/utils'
 import type { Task } from '@/lib/ipc'
-import { useUpdateTask, useUpdateProgress, useDeleteTask } from '@/hooks/useTasks'
+import { useUpdateTask, useUpdateProgress, useDeleteTask, useCompleteTask } from '@/hooks/useTasks'
 import { updateStarRating } from '@/lib/ipc'
 import { StarBadge } from './StarBadge'
 
@@ -16,37 +16,53 @@ export function TaskCard({ task }: TaskCardProps) {
   const updateTask = useUpdateTask()
   const updateProgress = useUpdateProgress()
   const deleteTask = useDeleteTask()
+  const completeTask = useCompleteTask()
 
   const isDone = task.status === 'done'
   const deadlinePast = task.due_at && isPast(new Date(task.due_at)) && !isDone
   const deadlineToday = task.due_at && isToday(new Date(task.due_at))
 
   const handleStatusChange = async () => {
-    let nextStatus: string, nextProgress: number
-    if (task.status === 'pending') {
-      nextStatus = 'in_progress'
-      nextProgress = 25
-    } else if (task.status === 'in_progress') {
-      nextStatus = 'done'
-      nextProgress = 100
-    } else {
-      return // done stays done, don't cycle
-    }
+    try {
+      let nextStatus: string, nextProgress: number
+      if (task.status === 'pending') {
+        nextStatus = 'in_progress'
+        nextProgress = 25
+      } else if (task.status === 'in_progress') {
+        // When completing with partial progress, scale stars via complete_task_with_progress
+        if (task.progress < 100) {
+          await completeTask.mutateAsync(task.id)
+          return
+        }
+        nextStatus = 'done'
+        nextProgress = 100
+      } else {
+        return // done stays done
+      }
 
-    await updateTask.mutateAsync({
-      id: task.id,
-      title: task.title,
-      description: task.description,
-      status: nextStatus,
-      progress: nextProgress,
-      star_value: task.star_value,
-      due_at: task.due_at,
-      remind_at: task.remind_at,
-    })
+      console.log('Status change:', task.id, task.status, '→', nextStatus)
+      await updateTask.mutateAsync({
+        id: task.id,
+        title: task.title,
+        description: task.description,
+        status: nextStatus,
+        progress: nextProgress,
+        star_value: task.star_value,
+        due_at: task.due_at,
+        remind_at: task.remind_at,
+      })
+    } catch (err) {
+      console.error('Status change failed:', err)
+    }
   }
 
   const handleProgressChange = async (pct: number) => {
     if (pct >= 100) {
+      // When completing with partial progress, scale stars
+      if (task.progress < 100) {
+        await completeTask.mutateAsync(task.id)
+        return
+      }
       await updateTask.mutateAsync({
         id: task.id,
         title: task.title,
@@ -150,23 +166,37 @@ export function TaskCard({ task }: TaskCardProps) {
 
               {showStarPicker && (
                 <div className="absolute top-full left-0 mt-1 bg-surface-1 border border-surface-3 rounded-md p-1.5 z-10 shadow-elevated animate-scale-in">
-                  <div className="flex gap-1">
-                    {[1, 2, 3].map((r) => (
+                  {/* Row 1: 1-5 */}
+                  <div className="flex gap-1 mb-1">
+                    {[1, 2, 3, 4, 5].map((r) => (
                       <button
                         key={r}
                         type="button"
                         onClick={() => handleStarChange(r)}
-                        className="p-1 hover:bg-surface-2 rounded transition-colors duration-150"
+                        className={cn(
+                          'w-7 h-7 rounded text-xs font-medium transition-colors duration-150',
+                          'hover:bg-surface-2',
+                          r <= 3 ? 'text-blue-400' : 'text-amber-400',
+                        )}
                       >
-                        <div className="flex gap-0.5">
-                          {Array.from({ length: r }).map((_, i) => (
-                            <Star
-                              key={i}
-                              size={14}
-                              className="fill-accent-400 text-accent-400"
-                            />
-                          ))}
-                        </div>
+                        {r}
+                      </button>
+                    ))}
+                  </div>
+                  {/* Row 2: 6-10 */}
+                  <div className="flex gap-1">
+                    {[6, 7, 8, 9, 10].map((r) => (
+                      <button
+                        key={r}
+                        type="button"
+                        onClick={() => handleStarChange(r)}
+                        className={cn(
+                          'w-7 h-7 rounded text-xs font-medium transition-colors duration-150',
+                          'hover:bg-surface-2',
+                          'text-orange-400',
+                        )}
+                      >
+                        {r}
                       </button>
                     ))}
                   </div>

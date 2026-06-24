@@ -5,6 +5,7 @@ import {
   updateTask as ipcUpdateTask,
   updateProgress as ipcUpdateProgress,
   deleteTask as ipcDeleteTask,
+  completeTask as ipcCompleteTask,
   getTodayStats,
 } from '@/lib/ipc'
 import type { Task, DailyStats } from '@/lib/ipc'
@@ -71,5 +72,16 @@ export function useTodayStats() {
     queryKey: ['todayStats'],
     queryFn: getTodayStats,
     refetchInterval: 30_000,
+  })
+}
+
+export function useCompleteTask() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (id: string) => ipcCompleteTask(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['tasks'] })
+      queryClient.invalidateQueries({ queryKey: ['todayStats'] })
+    },
   })
 }

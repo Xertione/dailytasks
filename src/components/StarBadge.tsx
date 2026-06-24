@@ -1,4 +1,3 @@
-import { Star } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 interface StarBadgeProps {
@@ -8,16 +7,42 @@ interface StarBadgeProps {
   className?: string
 }
 
-const ratingConfig: Record<number, { color: string; label: string }> = {
-  0: { color: 'text-text-disabled', label: '分析中...' },
-  1: { color: 'text-blue-400', label: '普通' },
-  2: { color: 'text-accent-400', label: '重要' },
-  3: { color: 'text-orange-400', label: '紧急' },
+function getConfig(rating: number): { color: string; bg: string; border: string; label: string } {
+  if (rating === 0) {
+    return {
+      color: 'text-text-disabled',
+      bg: 'bg-transparent',
+      border: 'border-dashed border-surface-3',
+      label: '分析中',
+    }
+  }
+  if (rating <= 3) {
+    return {
+      color: 'text-blue-400',
+      bg: 'bg-blue-400/10',
+      border: 'border-blue-400/30',
+      label: `${rating}`,
+    }
+  }
+  if (rating <= 6) {
+    return {
+      color: 'text-amber-400',
+      bg: 'bg-amber-400/10',
+      border: 'border-amber-400/30',
+      label: `${rating}`,
+    }
+  }
+  // 7-10
+  return {
+    color: 'text-orange-400',
+    bg: 'bg-orange-400/10',
+    border: 'border-orange-400/30',
+    label: `${rating}⭐`,
+  }
 }
 
 export function StarBadge({ rating, reason, onClick, className }: StarBadgeProps) {
-  const config = ratingConfig[rating] ?? ratingConfig[0]
-  const stars = Array.from({ length: 3 })
+  const config = getConfig(rating)
 
   return (
     <button
@@ -25,29 +50,21 @@ export function StarBadge({ rating, reason, onClick, className }: StarBadgeProps
       onClick={onClick}
       title={reason}
       className={cn(
-        'inline-flex items-center gap-0.5 rounded px-1.5 py-0.5',
-        'transition-all duration-150',
+        'inline-flex items-center justify-center rounded-full w-8 h-8 text-xs font-semibold',
+        'border transition-all duration-150',
         'hover:-translate-y-px hover:bg-surface-2',
-        rating === 0 && 'border border-dashed border-surface-3 animate-[pulse-glow_2s_ease-in-out_infinite]',
+        config.color,
+        config.bg,
+        config.border,
+        rating === 0 && 'animate-[pulse-glow_2s_ease-in-out_infinite]',
         className,
       )}
     >
-      {stars.map((_, i) => (
-        <Star
-          key={i}
-          size={14}
-          className={cn(
-            i < rating
-              ? cn('fill-current', config.color)
-              : 'text-surface-3',
-            'transition-colors duration-150',
-            rating === 0 && 'animate-pulse',
-          )}
-        />
-      ))}
-      <span className={cn('text-[10px] ml-0.5', config.color)}>
-        {config.label}
-      </span>
+      {rating === 0 ? (
+        <span className="text-[9px] text-text-disabled">{config.label}</span>
+      ) : (
+        <span>{config.label}</span>
+      )}
     </button>
   )
 }

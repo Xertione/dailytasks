@@ -180,6 +180,7 @@ pub fn run() {
             commands::tasks::get_today_stats,
             commands::tasks::update_progress,
             commands::tasks::update_star_rating,
+            commands::tasks::complete_task_with_progress,
             commands::ai::analyze_task_manually,
             commands::ai::get_ai_status,
             commands::settings::get_settings,

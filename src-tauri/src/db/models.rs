@@ -7,7 +7,7 @@ pub struct Task {
     pub description: String,
     pub status: String,         // pending | in_progress | done | archived
     pub progress: i32,          // 0-100, task progress percentage
-    pub star_value: i32,        // 0=未评估, 1~3
+    pub star_value: i32,        // 0=未评估, 1~10
     pub star_reason: String,
     pub urgency: i32,
     pub value_score: i32,

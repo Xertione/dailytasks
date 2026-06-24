@@ -117,10 +117,10 @@ fn extract_ai_result(content: &str) -> Result<AiResult, String> {
             let json_block = &trimmed[start..end];
             if let Ok(result) = serde_json::from_str::<Value>(json_block) {
                 return Ok(AiResult {
-                    star_value: result["star_value"].as_i64().unwrap_or(1) as i32,
-                    value_score: result["value_score"].as_i64().unwrap_or(1) as i32,
-                    urgency: result["urgency"].as_i64().unwrap_or(1) as i32,
-                    potential: result["potential"].as_i64().unwrap_or(1) as i32,
+                    star_value: result["star_value"].as_i64().unwrap_or(5) as i32,
+                    value_score: result["value_score"].as_i64().unwrap_or(5) as i32,
+                    urgency: result["urgency"].as_i64().unwrap_or(5) as i32,
+                    potential: result["potential"].as_i64().unwrap_or(5) as i32,
                     reason: result["reason"]
                         .as_str()
                         .unwrap_or("")
@@ -135,11 +135,11 @@ fn extract_ai_result(content: &str) -> Result<AiResult, String> {
     // Fallback: return default values
     log::warn!("Failed to parse AI response, using defaults");
     Ok(AiResult {
-        star_value: 1,
-        value_score: 1,
-        urgency: 1,
-        potential: 1,
+        star_value: 5,
+        value_score: 5,
+        urgency: 5,
+        potential: 5,
         reason: "无法解析 AI 返回结果".to_string(),
-        estimated_minutes: 30,
+        estimated_minutes: 45,
     })
 }
