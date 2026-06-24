@@ -49,6 +49,8 @@ pub fn run() {
 
             // 2. Initialize database
             let conn = db::init_db(&app_dir).expect("failed to initialize database");
+            // Load API key from DB if not in env (survives install/uninstall)
+            config::load_api_key_from_db(&conn);
             let db_connection = DbConnection(Mutex::new(conn));
             app.manage(db_connection);
 

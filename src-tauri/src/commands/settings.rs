@@ -66,9 +66,22 @@ pub fn set_nudge_style(
 }
 
 #[tauri::command]
-pub fn is_first_run() -> Result<bool, String> {
-    let api_key = std::env::var("DEEPSEEK_API_KEY").unwrap_or_default();
-    Ok(api_key.is_empty())
+pub fn is_first_run(db: State<'_, DbConnection>) -> Result<bool, String> {
+    // Check env var first
+    let env_key = std::env::var("DEEPSEEK_API_KEY").unwrap_or_default();
+    if !env_key.is_empty() {
+        return Ok(false);
+    }
+    // Fall back to DB
+    let conn = db.lock();
+    let db_key: String = conn
+        .query_row(
+            "SELECT value FROM settings WHERE key='deepseek_api_key'",
+            [],
+            |row| row.get(0),
+        )
+        .unwrap_or_default();
+    Ok(db_key.is_empty())
 }
 
 #[tauri::command]

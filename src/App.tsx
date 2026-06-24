@@ -19,11 +19,22 @@ type Tab = 'tasks' | 'pomodoro' | 'history' | 'chat'
 function App() {
   const [tab, setTab] = useState<Tab>('tasks')
   const { toggleSettings } = useUiStore()
-  const [showOnboarding, setShowOnboarding] = useState(true)
+  const [showOnboarding, setShowOnboarding] = useState<boolean | null>(null)
 
   useEffect(() => {
-    isFirstRun().then(first => setShowOnboarding(first))
+    // Wait a tick for Tauri IPC bridge to initialize
+    const timer = setTimeout(() => {
+      isFirstRun()
+        .then(first => setShowOnboarding(first))
+        .catch(() => setShowOnboarding(false))
+    }, 200)
+    return () => clearTimeout(timer)
   }, [])
+
+  // Show nothing while checking — prevents black screen flicker
+  if (showOnboarding === null) {
+    return <div className="h-screen bg-surface-0" />
+  }
 
   if (showOnboarding) {
     return <OnboardingView onComplete={() => setShowOnboarding(false)} />

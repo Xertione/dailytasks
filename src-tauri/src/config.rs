@@ -238,6 +238,23 @@ pub fn get_config() -> &'static AppConfig {
     })
 }
 
+/// Called after DB is initialized — loads API key from DB if not in env
+pub fn load_api_key_from_db(conn: &rusqlite::Connection) {
+    let env_key = std::env::var("DEEPSEEK_API_KEY").unwrap_or_default();
+    if env_key.is_empty() {
+        if let Ok(key) = conn.query_row(
+            "SELECT value FROM settings WHERE key='deepseek_api_key'",
+            [],
+            |row| row.get::<_, String>(0),
+        ) {
+            if !key.is_empty() {
+                std::env::set_var("DEEPSEEK_API_KEY", &key);
+                log::info!("Loaded API key from database");
+            }
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
