@@ -1,0 +1,26 @@
+# ===========================================
+# 每日任务 — 应用配置
+# ===========================================
+
+[app]
+name = "每日任务"
+hotkey = "Ctrl+Shift+T"            # 呼出快捷键
+daily_summary_time = "18:00"       # 每日总结时间（HH:MM）
+idle_remind_hours = 24             # 停滞提醒阈值（小时）
+auto_start = false                 # 开机自启（默认关闭）
+
+[ai]
+provider = "deepseek"                  # deepseek | openai | custom
+base_url = "https://api.deepseek.com"  # API 端点
+model = "deepseek-chat"
+max_tokens = 300
+temperature = 0.3
+timeout_secs = 15
+retry_count = 2
+
+[ai.local_fallback]
+enabled = true                     # 离线时启用本地规则
+
+[nudge]
+default_style = "gentle"           # gentle | direct | humorous
+use_ai_enhance = false             # 是否用 AI 生成个性化话术
