@@ -23,7 +23,7 @@ impl AnalysisQueue {
     pub fn new(app_handle: AppHandle) -> Self {
         let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel::<QueueItem>();
 
-        tokio::spawn(async move {
+        tauri::async_runtime::spawn(async move {
             let provider = Arc::new(DeepSeekProvider::new());
 
             while let Some(item) = rx.recv().await {

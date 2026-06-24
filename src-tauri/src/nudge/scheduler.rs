@@ -4,7 +4,7 @@ use tauri::{AppHandle, Emitter, Manager};
 use crate::DbConnection;
 
 pub fn start_scheduler(app_handle: AppHandle) {
-    tokio::spawn(async move {
+    tauri::async_runtime::spawn(async move {
         let mut interval = tokio::time::interval(std::time::Duration::from_secs(60));
         let mut last_daily_summary = String::new();
 
