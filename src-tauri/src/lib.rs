@@ -183,6 +183,7 @@ pub fn run() {
             commands::tasks::complete_task_with_progress,
             commands::tasks::set_countdown,
             commands::tasks::complete_with_note,
+            commands::chat::chat_with_ai,
             commands::ai::analyze_task_manually,
             commands::ai::get_ai_status,
             commands::settings::get_settings,

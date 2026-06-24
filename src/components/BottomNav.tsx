@@ -1,4 +1,4 @@
-import { ListTodo, Timer, History } from 'lucide-react'
+import { ListTodo, Timer, History, MessageCircle } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 interface BottomNavProps {
@@ -10,6 +10,7 @@ const tabs = [
   { key: 'tasks', label: '任务', Icon: ListTodo },
   { key: 'pomodoro', label: '番茄钟', Icon: Timer },
   { key: 'history', label: '历史', Icon: History },
+  { key: 'chat', label: '聊天', Icon: MessageCircle },
 ]
 
 export function BottomNav({ active, onChange }: BottomNavProps) {

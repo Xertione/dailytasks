@@ -1,5 +1,6 @@
 import { useState, useCallback } from 'react'
 import { Settings } from 'lucide-react'
+import { ChatView } from '@/components/ChatView'
 import { useUiStore } from '@/stores/uiStore'
 import { useTaskAnalyzedEvent, useQuickAddEvent, useShowProgressEvent, useReminderEvent, useStaleTaskEvent, useDailySummaryEvent } from '@/hooks/useTauriEvent'
 import { Clock } from '@/components/Clock'
@@ -11,7 +12,7 @@ import { HistoryView } from '@/components/HistoryView'
 import { SettingsDialog } from '@/components/SettingsDialog'
 import { Toast } from '@/components/Toast'
 
-type Tab = 'tasks' | 'pomodoro' | 'history'
+type Tab = 'tasks' | 'pomodoro' | 'history' | 'chat'
 
 function App() {
   const [tab, setTab] = useState<Tab>('tasks')
@@ -55,6 +56,7 @@ function App() {
         {tab === 'tasks' && <TaskView />}
         {tab === 'pomodoro' && <PomodoroView />}
         {tab === 'history' && <HistoryView />}
+        {tab === 'chat' && <ChatView />}
       </div>
 
       {/* Bottom nav */}

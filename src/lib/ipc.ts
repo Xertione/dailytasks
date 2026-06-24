@@ -152,3 +152,19 @@ export async function setCountdown(id: string, countdownSecs: number): Promise<T
 export async function completeWithNote(id: string, note: string): Promise<Task> {
   return invoke('complete_with_note', { id, note })
 }
+
+// ============================================
+// AI 聊天命令
+// ============================================
+
+export interface ChatMessage {
+  role: 'user' | 'assistant'
+  content: string
+}
+
+export async function chatWithAi(
+  message: string,
+  history: ChatMessage[],
+): Promise<string> {
+  return invoke('chat_with_ai', { message, history })
+}

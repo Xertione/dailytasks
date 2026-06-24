@@ -4,7 +4,6 @@ import { format, isPast, isToday } from 'date-fns'
 import { cn } from '@/lib/utils'
 import type { Task } from '@/lib/ipc'
 import { useUpdateTask, useUpdateProgress, useDeleteTask, useCompleteWithNote } from '@/hooks/useTasks'
-import { updateStarRating } from '@/lib/ipc'
 import { StarBadge } from './StarBadge'
 import { CompletionDialog } from './CompletionDialog'
 
@@ -77,7 +76,6 @@ export function TaskCard({ task }: TaskCardProps) {
   }, [showStarPicker])
 
   const handleStatusClick = () => {
-    if (isDone) return
     handleStatusChange()
   }
 
@@ -90,6 +88,17 @@ export function TaskCard({ task }: TaskCardProps) {
           description: task.description,
           status: 'in_progress',
           progress: 25,
+          star_value: task.star_value,
+          due_at: task.due_at,
+          remind_at: task.remind_at,
+        })
+      } else if (task.status === 'done') {
+        await updateTask.mutateAsync({
+          id: task.id,
+          title: task.title,
+          description: task.description,
+          status: 'in_progress',
+          progress: 100,
           star_value: task.star_value,
           due_at: task.due_at,
           remind_at: task.remind_at,
@@ -117,11 +126,16 @@ export function TaskCard({ task }: TaskCardProps) {
 
   const handleStarChange = async (rating: number) => {
     setShowStarPicker(false)
-    const valueScore = task.value_score > 0 ? task.value_score : rating
-    const urgency = task.urgency > 0 ? task.urgency : rating
-    const potential = task.potential > 0 ? task.potential : rating
-    const reason = task.star_reason || '用户手动修正'
-    await updateStarRating(task.id, rating, valueScore, urgency, potential, reason)
+    await updateTask.mutateAsync({
+      id: task.id,
+      title: task.title,
+      description: task.description,
+      status: task.status,
+      progress: task.progress,
+      star_value: rating,
+      due_at: task.due_at,
+      remind_at: task.remind_at,
+    })
   }
 
   const handleDelete = async () => {
@@ -160,16 +174,17 @@ export function TaskCard({ task }: TaskCardProps) {
           <button
             type="button"
             onClick={handleStatusClick}
+            title={task.status === 'done' ? '点击回退到进行中' : undefined}
             className={cn(
               'mt-0.5 w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0',
               'transition-all duration-200 hover:scale-110',
               task.status === 'pending' && 'border-surface-3 hover:border-accent-400',
               task.status === 'in_progress' && 'border-accent-400 bg-accent-400/20',
-              task.status === 'done' && 'border-success bg-success',
+              task.status === 'done' && 'border-success bg-transparent hover:border-amber-400 hover:bg-amber-400/10',
             )}
           >
             {task.status === 'done' && (
-              <Check size={11} className="text-surface-0" strokeWidth={3} />
+              <Check size={11} className="text-success" strokeWidth={3} />
             )}
             {task.status === 'in_progress' && (
               <div className={cn(
