@@ -7,10 +7,10 @@ interface BottomNavProps {
 }
 
 const tabs = [
-  { key: 'tasks', label: '任务', Icon: ListTodo },
-  { key: 'pomodoro', label: '番茄钟', Icon: Timer },
-  { key: 'history', label: '历史', Icon: History },
-  { key: 'chat', label: '聊天', Icon: MessageCircle },
+  { key: 'tasks' as const, label: '任务', Icon: ListTodo },
+  { key: 'pomodoro' as const, label: '番茄钟', Icon: Timer },
+  { key: 'history' as const, label: '历史', Icon: History },
+  { key: 'chat' as const, label: '聊天', Icon: MessageCircle },
 ]
 
 export function BottomNav({ active, onChange }: BottomNavProps) {

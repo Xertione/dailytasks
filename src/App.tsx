@@ -60,7 +60,7 @@ function App() {
       </div>
 
       {/* Bottom nav */}
-      <BottomNav active={tab} onChange={setTab} />
+      <BottomNav active={tab} onChange={(t: string) => setTab(t as Tab)} />
 
       <SettingsDialog />
       <Toast />
