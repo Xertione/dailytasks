@@ -23,7 +23,20 @@ pub fn run() {
         .plugin(tauri_plugin_log::Builder::default().build())
         .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_shell::init())
-        .plugin(tauri_plugin_global_shortcut::Builder::new().build())
+        .plugin(tauri_plugin_global_shortcut::Builder::new()
+            .with_handler(|app, shortcut, _event| {
+                use tauri::Manager;
+                use tauri_plugin_global_shortcut::{Code, Modifiers};
+                if shortcut.matches(Modifiers::CONTROL | Modifiers::SHIFT, Code::KeyT) {
+                    log::info!("Global shortcut Ctrl+Shift+T pressed");
+                    if let Some(window) = app.get_webview_window("main") {
+                        let _ = window.show();
+                        let _ = window.unminimize();
+                        let _ = window.set_focus();
+                    }
+                }
+            })
+            .build())
         .setup(|app| {
             use tauri::Manager;
 
@@ -117,12 +130,9 @@ pub fn run() {
                                     if let Some(window) =
                                         handle.get_webview_window("main")
                                     {
-                                        if window.is_visible().unwrap_or(false) {
-                                            let _ = window.hide();
-                                        } else {
-                                            let _ = window.show();
-                                            let _ = window.set_focus();
-                                        }
+                                        let _ = window.show();
+                                        let _ = window.unminimize();
+                                        let _ = window.set_focus();
                                     }
                                 }
                             }
@@ -141,7 +151,7 @@ pub fn run() {
                 std::mem::forget(tray);
             }
 
-            // 6. Handle window close → hide to tray
+            // 6. Handle window close → minimize to tray (normal app behavior)
             let main_window = app
                 .get_webview_window("main")
                 .expect("main window not found");
@@ -149,20 +159,11 @@ pub fn run() {
             main_window.on_window_event(move |event| {
                 if let tauri::WindowEvent::CloseRequested { api, .. } = event {
                     api.prevent_close();
+                    // Minimize instead of hide — keeps taskbar entry, normal UX
+                    let _ = win_clone.minimize();
                     let _ = win_clone.hide();
                 }
             });
-
-            // 7. Register global shortcut Ctrl+Shift+T
-            {
-                use tauri_plugin_global_shortcut::{Code, GlobalShortcutExt, Modifiers, Shortcut};
-
-                let shortcut =
-                    Shortcut::new(Some(Modifiers::CONTROL | Modifiers::SHIFT), Code::KeyT);
-                if let Err(e) = app.global_shortcut().register(shortcut) {
-                    log::warn!("Failed to register global shortcut: {}", e);
-                }
-            }
 
             // 8. Start nudge scheduler
             nudge::scheduler::start_scheduler(app.handle().clone());
