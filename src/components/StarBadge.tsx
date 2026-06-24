@@ -9,7 +9,7 @@ interface StarBadgeProps {
 }
 
 const ratingConfig: Record<number, { color: string; label: string }> = {
-  0: { color: 'text-text-disabled', label: 'AI评估中' },
+  0: { color: 'text-text-disabled', label: '分析中...' },
   1: { color: 'text-blue-400', label: '普通' },
   2: { color: 'text-accent-400', label: '重要' },
   3: { color: 'text-orange-400', label: '紧急' },
@@ -39,10 +39,9 @@ export function StarBadge({ rating, reason, onClick, className }: StarBadgeProps
           className={cn(
             i < rating
               ? cn('fill-current', config.color)
-              : rating === 0
-                ? 'text-surface-3'
-                : 'text-surface-3',
+              : 'text-surface-3',
             'transition-colors duration-150',
+            rating === 0 && 'animate-pulse',
           )}
         />
       ))}

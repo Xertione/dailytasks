@@ -13,7 +13,6 @@ interface TaskCardProps {
 
 export function TaskCard({ task }: TaskCardProps) {
   const [showStarPicker, setShowStarPicker] = useState(false)
-  const [confirmDelete, setConfirmDelete] = useState(false)
   const updateTask = useUpdateTask()
   const deleteTask = useDeleteTask()
 
@@ -52,16 +51,25 @@ export function TaskCard({ task }: TaskCardProps) {
   }
 
   const handleDelete = async () => {
-    if (!confirmDelete) {
-      setConfirmDelete(true)
-      setTimeout(() => setConfirmDelete(false), 3000)
-      return
-    }
     await deleteTask.mutateAsync(task.id)
+    window.dispatchEvent(new CustomEvent('show-toast', {
+      detail: { message: '任务已删除', action: 'undo', taskId: task.id, taskTitle: task.title },
+    }))
   }
 
   return (
     <div
+      tabIndex={0}
+      data-task-id={task.id}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter') {
+          e.preventDefault()
+          handleStatusChange()
+        } else if (e.key === 'Delete') {
+          e.preventDefault()
+          handleDelete()
+        }
+      }}
       className={cn(
         'group bg-surface-1 border border-surface-3 rounded-lg p-3',
         'hover:-translate-y-px hover:border-surface-3/80 hover:bg-surface-1/80',
@@ -176,9 +184,7 @@ export function TaskCard({ task }: TaskCardProps) {
           className={cn(
             'p-1 rounded transition-all duration-200',
             'opacity-0 group-hover:opacity-100',
-            confirmDelete
-              ? 'bg-danger/20 text-danger opacity-100'
-              : 'text-text-disabled hover:text-danger hover:bg-surface-2',
+            'text-text-disabled hover:text-danger hover:bg-surface-2',
           )}
         >
           <Trash2 size={14} />

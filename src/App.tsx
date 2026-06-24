@@ -9,6 +9,7 @@ import { TaskList } from '@/components/TaskList'
 import { ProgressPanel } from '@/components/ProgressPanel'
 import { NudgeBanner } from '@/components/NudgeBanner'
 import { SettingsDialog } from '@/components/SettingsDialog'
+import { Toast } from '@/components/Toast'
 
 function App() {
   const { toggleSettings } = useUiStore()
@@ -86,6 +87,9 @@ function App() {
 
       {/* Settings overlay */}
       <SettingsDialog />
+
+      {/* Toast notifications */}
+      <Toast />
     </div>
   )
 }

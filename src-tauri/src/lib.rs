@@ -56,8 +56,8 @@ pub fn run() {
 
                 let quick_add =
                     MenuItemBuilder::with_id("quick_add", "快速添加").build(app)?;
-                let today_progress =
-                    MenuItemBuilder::with_id("today_progress", "今日进度").build(app)?;
+                let show_window =
+                    MenuItemBuilder::with_id("show_window", "显示主窗口").build(app)?;
                 let separator1 = PredefinedMenuItem::separator(app)?;
                 let auto_start =
                     CheckMenuItemBuilder::with_id("auto_start", "开机自启").build(app)?;
@@ -66,7 +66,7 @@ pub fn run() {
 
                 let menu = MenuBuilder::new(app)
                     .item(&quick_add)
-                    .item(&today_progress)
+                    .item(&show_window)
                     .item(&separator1)
                     .item(&auto_start)
                     .item(&separator2)
@@ -88,9 +88,12 @@ pub fn run() {
                                 log::info!("Emitting app:quick-add");
                                 let _ = app.emit("app:quick-add", ());
                             }
-                            "today_progress" => {
-                                log::info!("Emitting app:show-progress");
-                                let _ = app.emit("app:show-progress", ());
+                            "show_window" => {
+                                log::info!("Showing main window");
+                                if let Some(window) = app.get_webview_window("main") {
+                                    let _ = window.show();
+                                    let _ = window.set_focus();
+                                }
                             }
                             "quit" => {
                                 log::info!("Quitting application");

@@ -4,7 +4,10 @@ import { cn } from '@/lib/utils'
 import { useAddTask } from '@/hooks/useTasks'
 
 export function TaskInput() {
-  const [title, setTitle] = useState('')
+  const [title, setTitle] = useState(() => {
+    try { return localStorage.getItem('task-draft') || '' }
+    catch { return '' }
+  })
   const [expanded, setExpanded] = useState(false)
   const [deadline, setDeadline] = useState('')
   const [reminder, setReminder] = useState('')
@@ -15,6 +18,24 @@ export function TaskInput() {
     const handler = () => inputRef.current?.focus()
     window.addEventListener('focus-task-input', handler)
     return () => window.removeEventListener('focus-task-input', handler)
+  }, [])
+
+  useEffect(() => {
+    try { localStorage.setItem('task-draft', title) }
+    catch { /* localStorage unavailable */ }
+  }, [title])
+
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const text = (e as CustomEvent<string>).detail
+      if (typeof text === 'string') {
+        setTitle(text)
+        setExpanded(true)
+        inputRef.current?.focus()
+      }
+    }
+    window.addEventListener('set-draft-text', handler)
+    return () => window.removeEventListener('set-draft-text', handler)
   }, [])
 
   const handleSubmit = async (e: FormEvent) => {
@@ -30,6 +51,7 @@ export function TaskInput() {
     setDeadline('')
     setReminder('')
     setExpanded(false)
+    try { localStorage.removeItem('task-draft') } catch { /* ok */ }
     inputRef.current?.focus()
   }
 
@@ -50,7 +72,17 @@ export function TaskInput() {
             type="text"
             value={title}
             onChange={(e) => setTitle(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Escape') {
+                if (expanded) {
+                  setExpanded(false)
+                } else {
+                  setTitle('')
+                }
+              }
+            }}
             placeholder="记录一个新任务..."
+            tabIndex={0}
             className={cn(
               'flex-1 bg-transparent border-0',
               'text-sm text-text-primary placeholder:text-text-tertiary',

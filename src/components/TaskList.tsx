@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { ChevronDown, Sparkles } from 'lucide-react'
+import { ChevronDown, ClipboardList } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { Task } from '@/lib/ipc'
 import { TaskCard } from './TaskCard'
@@ -39,11 +39,24 @@ export function TaskList({ tasks, isLoading }: TaskListProps) {
   if (!tasks.length) {
     return (
       <div className="flex-1 flex flex-col items-center justify-center gap-3 px-6">
-        <div className="w-14 h-14 rounded-xl bg-surface-2 flex items-center justify-center">
-          <Sparkles size={28} className="text-surface-3" />
+        <div className="w-16 h-16 rounded-2xl bg-surface-2 flex items-center justify-center">
+          <ClipboardList size={32} className="text-surface-3" />
         </div>
-        <p className="text-text-secondary text-sm">还没有任务</p>
-        <p className="text-text-tertiary text-xs">在上方输入框记录一个任务吧</p>
+        <p className="text-text-primary text-sm font-medium">开始你的第一项任务吧</p>
+        <p className="text-text-tertiary text-xs -mt-1">记录一个任务，AI 会帮你分析优先级</p>
+        <button
+          type="button"
+          onClick={() => {
+            window.dispatchEvent(new CustomEvent('set-draft-text', { detail: '试用一下：写一份周报' }))
+          }}
+          className={cn(
+            'mt-1 text-xs text-accent-400 px-3 py-1.5 rounded-md',
+            'border border-accent-400/30 hover:bg-accent-400/10',
+            'transition-colors duration-150',
+          )}
+        >
+          试用一下
+        </button>
       </div>
     )
   }
@@ -56,7 +69,25 @@ export function TaskList({ tasks, isLoading }: TaskListProps) {
     .filter((g) => g.items.length > 0)
 
   return (
-    <div className="flex-1 overflow-y-auto px-3 py-1 space-y-4">
+    <div
+      className="flex-1 overflow-y-auto px-3 py-1 space-y-4"
+      tabIndex={0}
+      onKeyDown={(e) => {
+        if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+          e.preventDefault()
+          const cards = Array.from(
+            e.currentTarget.querySelectorAll<HTMLElement>('[data-task-id]'),
+          )
+          if (cards.length === 0) return
+          const focused = cards.findIndex((c) => c === document.activeElement)
+          const nextIdx =
+            e.key === 'ArrowDown'
+              ? Math.min(focused + 1, cards.length - 1)
+              : Math.max(focused - 1, 0)
+          cards[nextIdx]?.focus()
+        }
+      }}
+    >
       {grouped.map((group) => (
         <div key={group.key}>
           {/* Group header */}

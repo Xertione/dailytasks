@@ -22,6 +22,16 @@ export function ProgressPanel() {
     ? Math.round((tasks.reduce((sum, t) => sum + t.estimated_min, 0) / 60) * 10) / 10
     : 0
 
+  if (total === 0) {
+    return (
+      <div className="px-3 py-2.5 border-t border-surface-3">
+        <p className="text-xs text-text-tertiary text-center">
+          还没有任务，添加第一个吧 ✨
+        </p>
+      </div>
+    )
+  }
+
   return (
     <div className="px-3 py-2.5 border-t border-surface-3">
       {/* Progress bar */}
