@@ -4,12 +4,15 @@
 
 ## 特性
 
-- **极速记录**：打开即写，无需复杂表单
-- **AI 星级评估**：DeepSeek 自动分析任务价值/紧急度/潜力，1~3 星分级
-- **动态陪伴**：温和鼓励或适时催促，非冷冰冰的提醒
-- **轻量感知**：一眼看清今日完成量、总任务量、工作量
-- **常驻托盘**：Ctrl+Shift+T 随时呼出，关闭即隐藏，不影响工作流
-- **离线可用**：核心记录功能不依赖网络；AI 分析可降级为本地规则
+- **极速记录**：打开即写，无需复杂表单，草稿自动保存
+- **AI 10 星评估**：DeepSeek 自动分析任务价值/紧急度/潜力，1~10 星分级
+- **进度追踪**：进行中任务可设置 25%/50%/75%/100% 进度，满 100% 自动完成
+- **进度缩放星星**：部分完成也能提交，星星按完成比例计算
+- **成就积累**：累计星星统计，量化感知自己的产出
+- **动态陪伴**：温和鼓励或适时催促，三种话术风格可选
+- **常驻托盘**：关闭即最小化，Ctrl+Shift+T 随时恢复
+- **离线可用**：核心记录不依赖网络；AI 分析可降级为本地规则
+- **跨平台**：Windows 10+ / Linux
 
 ## 技术栈
 
@@ -31,29 +34,17 @@
 ### Windows
 
 ```bash
-# 1. 克隆项目
 git clone https://github.com/Xertione/dailytasks.git
 cd dailytasks
-
-# 2. 安装前端依赖
 npm install
-
-# 3. 配置 API Key
-cp .env.example .env
-# 编辑 .env，填入你的 DeepSeek API Key
-
-# 4. 开发模式运行
+cp .env.example .env   # 编辑填入 DeepSeek API Key
 npm run tauri dev
 ```
 
 ### Linux (Ubuntu/Debian)
 
 ```bash
-# 先安装系统依赖
-sudo apt update
-sudo apt install libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf libssl-dev
-
-# 然后同上
+sudo apt update && sudo apt install libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf libssl-dev
 git clone https://github.com/Xertione/dailytasks.git
 cd dailytasks
 npm install
@@ -61,30 +52,73 @@ cp .env.example .env
 npm run tauri dev
 ```
 
-### 配置 API Key
+## 配置
 
-1. 访问 [DeepSeek 开放平台](https://platform.deepseek.com/api_keys) 获取 API Key
-2. 复制 `.env.example` 为 `.env`，填入 Key：
+### API Key
+
+访问 [DeepSeek 开放平台](https://platform.deepseek.com/api_keys) 获取 Key，写入 `.env`：
 
 ```env
 DEEPSEEK_API_KEY=sk-your-key-here
 ```
 
-### 自定义 AI 提示词
+### 应用配置 (`config.toml`)
 
-编辑 `prompts/star_eval.md` 可调整 AI 星级评估的提示词模板。
+```toml
+[app]
+hotkey = "Ctrl+Shift+T"        # 全局快捷键
+daily_summary_time = "18:00"   # 每日总结时间
+idle_remind_hours = 24         # 停滞提醒阈值
 
-编辑 `prompts/nudges.toml` 可自定义鼓励/催促话术。
+[ai]
+provider = "deepseek"          # deepseek | openai | custom
+base_url = "https://api.deepseek.com"
+model = "deepseek-chat"
 
-### 自定义应用配置
+[nudge]
+default_style = "gentle"       # gentle | direct | humorous
+```
 
-编辑 `config.toml` 可调整：
+### 自定义提示词
 
-- 呼出快捷键（默认 Ctrl+Shift+T）
-- 每日总结时间（默认 18:00）
-- 停滞提醒阈值（默认 24h）
-- AI 模型与服务端点
-- 话术默认风格
+- `prompts/star_eval.md` — AI 星级评估提示词模板
+- `prompts/nudges.toml` — 三种风格的鼓励/催促话术
+
+## 使用说明
+
+### 任务状态
+
+```
+待处理 → 进行中（出现进度条）→ 已完成
+```
+
+点击左侧圆圈切换，停在"已完成"不循环。
+
+### 进度追踪
+
+进行中任务下方出现进度条，点击 25%/50%/75%/100%。满 100% 自动标记完成。部分完成也能提交——星星按比例缩放（如 AI 评 8 星，完成 50% 得 4 星）。
+
+### 10 星评估
+
+- 添加任务 → 几秒内 AI 自动分析 → 显示数字星级徽章
+- 蓝 1-3 / 琥珀 4-6 / 金 7-10
+- 点击徽章 → 弹出 1-10 选择器手动修正
+- 离线时自动降级为本地关键词规则
+
+### 键盘快捷键
+
+| 按键 | 行为 |
+|------|------|
+| `Ctrl+Shift+T` | 呼出/恢复窗口 |
+| `↑` `↓` | 导航任务卡片 |
+| `Enter` | 切换任务状态 |
+| `Delete` | 删除任务 |
+| `Esc` | 清空输入框 |
+
+### 系统托盘
+
+- **左键**：恢复窗口
+- **右键**：快速添加 / 显示主窗口 / 开机自启 / 退出
 
 ## 项目结构
 
@@ -92,58 +126,41 @@ DEEPSEEK_API_KEY=sk-your-key-here
 daily-tasks/
 ├── src/                          # React 前端
 │   ├── components/               # UI 组件
-│   │   ├── TaskInput.tsx         # 快速输入框
-│   │   ├── TaskCard.tsx          # 任务卡片（含星级/状态流转）
-│   │   ├── TaskList.tsx          # 分组任务列表
-│   │   ├── StarBadge.tsx         # 星级徽章
-│   │   ├── ProgressPanel.tsx     # 底部进度面板
+│   │   ├── TaskInput.tsx         # 快速输入（草稿自动保存）
+│   │   ├── TaskCard.tsx          # 任务卡片（星级/进度/状态）
+│   │   ├── TaskList.tsx          # 分组折叠列表
+│   │   ├── StarBadge.tsx         # 10 星数字徽章
+│   │   ├── ProgressPanel.tsx     # 底部进度 + 星星统计
 │   │   ├── NudgeBanner.tsx       # 鼓励话术横幅
-│   │   └── SettingsDialog.tsx    # 设置弹窗
-│   ├── hooks/                    # React Hooks
+│   │   ├── SettingsDialog.tsx    # 设置弹窗
+│   │   └── Toast.tsx             # 删除撤销通知
+│   ├── hooks/                    # React Query + Tauri Event
 │   ├── stores/                   # Zustand 状态
-│   ├── lib/                      # 工具 & IPC 封装
-│   └── styles/                   # 全局样式
+│   └── lib/                      # IPC 封装 + 工具
 ├── src-tauri/                    # Rust 后端
 │   ├── src/
-│   │   ├── commands/             # IPC 命令（CRUD/AI/设置）
-│   │   ├── db/                   # SQLite 数据库层
-│   │   ├── ai/                   # AI 分析（Provider/Queue/Prompt）
-│   │   ├── nudge/                # 话术引擎 & 提醒调度
-│   │   └── main.rs / lib.rs      # 入口 & 启动逻辑
-│   ├── prompts/                  # AI 提示词 & 话术模板
+│   │   ├── commands/             # 14 个 IPC 命令
+│   │   ├── db/                   # SQLite + 数据模型
+│   │   ├── ai/                   # Provider/Queue/Prompt/LocalRules
+│   │   ├── nudge/                # 话术引擎 + 调度器
+│   │   └── main.rs / lib.rs
+│   ├── prompts/                  # AI 提示词 / 话术模板
 │   └── Cargo.toml
 ├── config.toml                   # 应用配置
 ├── .env.example                  # 环境变量模板
+├── TEST_CHECKLIST.md             # 37 项手动测试清单
 └── README.md
 ```
 
-## 使用说明
+## 测试
 
-### 任务状态流转
+```bash
+# Rust 单元测试 (23 项)
+cd src-tauri && cargo test
 
+# 手动测试清单
+# 见 TEST_CHECKLIST.md — 37 项覆盖全部功能
 ```
-待处理 (pending) → 进行中 (in_progress) → 已完成 (done)
-                      ↓
-                   归档 (archived)
-```
-
-点击任务左侧圆圈切换状态。
-
-### 星级评估
-
-- 添加任务后，AI 自动分析并给出 1~3 星
-- 点击星级徽章可手动修正
-- 离线时自动降级为本地关键词规则
-
-### 系统托盘
-
-- 左键点击托盘图标：显示/隐藏窗口
-- 右键菜单：快速添加、今日进度、开机自启、退出
-- 关闭窗口（点击 ×）：隐藏到托盘，不退出
-
-### 全局快捷键
-
-- `Ctrl+Shift+T`：呼出/隐藏窗口
 
 ## 许可证
 
