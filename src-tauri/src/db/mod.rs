@@ -29,7 +29,9 @@ pub fn init_db(app_dir: &Path) -> SqliteResult<Connection> {
             remind_at TEXT,
             created_at TEXT NOT NULL,
             updated_at TEXT NOT NULL,
-            completed_at TEXT
+            completed_at TEXT,
+            completion_note TEXT NOT NULL DEFAULT '',
+            countdown_secs INTEGER NOT NULL DEFAULT 0
         );
 
         CREATE TABLE IF NOT EXISTS daily_stats (
@@ -57,6 +59,32 @@ pub fn init_db(app_dir: &Path) -> SqliteResult<Connection> {
         conn.execute_batch("ALTER TABLE tasks ADD COLUMN progress INTEGER NOT NULL DEFAULT 0;")
             .ok();
         log::info!("Migration: added progress column to tasks");
+    }
+
+    // Migration: completion_note
+    let has_note: i32 = conn
+        .query_row(
+            "SELECT COUNT(*) FROM pragma_table_info('tasks') WHERE name='completion_note'",
+            [],
+            |row| row.get(0),
+        )
+        .unwrap_or(0);
+    if has_note == 0 {
+        conn.execute_batch("ALTER TABLE tasks ADD COLUMN completion_note TEXT NOT NULL DEFAULT '';")
+            .ok();
+    }
+
+    // Migration: countdown_secs
+    let has_cd: i32 = conn
+        .query_row(
+            "SELECT COUNT(*) FROM pragma_table_info('tasks') WHERE name='countdown_secs'",
+            [],
+            |row| row.get(0),
+        )
+        .unwrap_or(0);
+    if has_cd == 0 {
+        conn.execute_batch("ALTER TABLE tasks ADD COLUMN countdown_secs INTEGER NOT NULL DEFAULT 0;")
+            .ok();
     }
 
     log::info!("Database initialized at {:?}", db_path);

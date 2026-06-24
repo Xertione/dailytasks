@@ -7,6 +7,8 @@ import {
   deleteTask as ipcDeleteTask,
   completeTask as ipcCompleteTask,
   getTodayStats,
+  setCountdown as ipcSetCountdown,
+  completeWithNote as ipcCompleteWithNote,
 } from '@/lib/ipc'
 import type { Task, DailyStats } from '@/lib/ipc'
 
@@ -79,6 +81,27 @@ export function useCompleteTask() {
   const queryClient = useQueryClient()
   return useMutation({
     mutationFn: (id: string) => ipcCompleteTask(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['tasks'] })
+      queryClient.invalidateQueries({ queryKey: ['todayStats'] })
+    },
+  })
+}
+
+export function useSetCountdown() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (params: { id: string; countdownSecs: number }) =>
+      ipcSetCountdown(params.id, params.countdownSecs),
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['tasks'] }) },
+  })
+}
+
+export function useCompleteWithNote() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (params: { id: string; note: string }) =>
+      ipcCompleteWithNote(params.id, params.note),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['tasks'] })
       queryClient.invalidateQueries({ queryKey: ['todayStats'] })

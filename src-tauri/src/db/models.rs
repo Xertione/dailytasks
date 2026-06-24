@@ -18,6 +18,8 @@ pub struct Task {
     pub created_at: String,
     pub updated_at: String,
     pub completed_at: Option<String>,
+    pub completion_note: String,    // 用户完成时写的备注
+    pub countdown_secs: i32,        // 倒计时秒数，0=无倒计时
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

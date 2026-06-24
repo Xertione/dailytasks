@@ -10,6 +10,8 @@ import { ProgressPanel } from '@/components/ProgressPanel'
 import { NudgeBanner } from '@/components/NudgeBanner'
 import { SettingsDialog } from '@/components/SettingsDialog'
 import { Toast } from '@/components/Toast'
+import { Clock } from '@/components/Clock'
+import { PomodoroTimer } from '@/components/PomodoroTimer'
 
 function App() {
   const { toggleSettings } = useUiStore()
@@ -49,6 +51,7 @@ function App() {
           <h1 className="text-sm font-semibold text-text-primary tracking-wide select-none">
             每日任务
           </h1>
+          <Clock />
         </div>
         <div className="flex items-center gap-1">
           <button
@@ -79,6 +82,9 @@ function App() {
 
       {/* Task list (scrollable) */}
       <TaskList tasks={tasks ?? []} isLoading={isLoading} />
+
+      {/* Pomodoro Timer */}
+      <PomodoroTimer />
 
       {/* Bottom progress bar (always visible) */}
       <div className="shrink-0" id="progress-panel">

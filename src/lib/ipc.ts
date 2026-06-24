@@ -21,6 +21,8 @@ export interface Task {
   created_at: string
   updated_at: string
   completed_at: string | null
+  completion_note: string
+  countdown_secs: number
 }
 
 export interface DailyStats {
@@ -141,4 +143,12 @@ export async function getNudgeStyle(): Promise<string> {
 
 export async function setNudgeStyle(style: string): Promise<void> {
   return invoke('set_nudge_style', { style })
+}
+
+export async function setCountdown(id: string, countdownSecs: number): Promise<Task> {
+  return invoke('set_countdown', { id, countdownSecs })
+}
+
+export async function completeWithNote(id: string, note: string): Promise<Task> {
+  return invoke('complete_with_note', { id, note })
 }

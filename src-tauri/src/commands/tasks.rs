@@ -34,17 +34,20 @@ pub fn add_task(
         created_at: now.clone(),
         updated_at: now.clone(),
         completed_at: None,
+        completion_note: String::new(),
+        countdown_secs: 0,
     };
 
     let conn = db.lock();
     conn.execute(
-        "INSERT INTO tasks (id, title, description, status, progress, star_value, star_reason, urgency, value_score, potential, estimated_min, due_at, remind_at, created_at, updated_at, completed_at)
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16)",
+        "INSERT INTO tasks (id, title, description, status, progress, star_value, star_reason, urgency, value_score, potential, estimated_min, due_at, remind_at, created_at, updated_at, completed_at, completion_note, countdown_secs)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18)",
         rusqlite::params![
             task.id, task.title, task.description, task.status, task.progress,
             task.star_value, task.star_reason, task.urgency, task.value_score,
             task.potential, task.estimated_min, task.due_at, task.remind_at,
-            task.created_at, task.updated_at, task.completed_at
+            task.created_at, task.updated_at, task.completed_at,
+            task.completion_note, task.countdown_secs
         ],
     )
     .map_err(|e| e.to_string())?;
@@ -105,7 +108,7 @@ pub fn get_all_tasks(db: State<'_, DbConnection>) -> Result<Vec<Task>, String> {
     let conn = db.lock();
     let mut stmt = conn
         .prepare(
-            "SELECT id, title, description, status, progress, star_value, star_reason, urgency, value_score, potential, estimated_min, due_at, remind_at, created_at, updated_at, completed_at
+            "SELECT id, title, description, status, progress, star_value, star_reason, urgency, value_score, potential, estimated_min, due_at, remind_at, created_at, updated_at, completed_at, completion_note, countdown_secs
              FROM tasks ORDER BY created_at DESC",
         )
         .map_err(|e| e.to_string())?;
@@ -130,7 +133,7 @@ fn get_task_internal(
     id: &str,
 ) -> Result<Task, String> {
     conn.query_row(
-        "SELECT id, title, description, status, progress, star_value, star_reason, urgency, value_score, potential, estimated_min, due_at, remind_at, created_at, updated_at, completed_at
+        "SELECT id, title, description, status, progress, star_value, star_reason, urgency, value_score, potential, estimated_min, due_at, remind_at, created_at, updated_at, completed_at, completion_note, countdown_secs
          FROM tasks WHERE id = ?1",
         rusqlite::params![id],
         map_task,
@@ -269,6 +272,38 @@ pub fn complete_task_with_progress(
     get_task_internal(&conn, &id)
 }
 
+#[tauri::command]
+pub fn set_countdown(id: String, countdown_secs: i32, db: State<'_, DbConnection>) -> Result<Task, String> {
+    let conn = db.lock();
+    conn.execute("UPDATE tasks SET countdown_secs=?1, updated_at=?2 WHERE id=?3",
+        rusqlite::params![countdown_secs, chrono::Utc::now().format("%Y-%m-%dT%H:%M:%S%.3fZ").to_string(), id])
+        .map_err(|e| e.to_string())?;
+    get_task_internal(&conn, &id)
+}
+
+#[tauri::command]
+pub fn complete_with_note(id: String, note: String, db: State<'_, DbConnection>, queue: State<'_, crate::ai::queue::AnalysisQueue>) -> Result<Task, String> {
+    let now = chrono::Utc::now().format("%Y-%m-%dT%H:%M:%S%.3fZ").to_string();
+    let conn = db.lock();
+    conn.execute("UPDATE tasks SET status='done', progress=100, completion_note=?1, completed_at=?2, updated_at=?3 WHERE id=?4",
+        rusqlite::params![note, now.clone(), now, id])
+        .map_err(|e| e.to_string())?;
+    
+    let task = get_task_internal(&conn, &id)?;
+    
+    // If there's a note, enqueue for AI summarization
+    if !note.is_empty() {
+        let q = (*queue).clone();
+        let tid = task.id.clone();
+        let ttl = task.title.clone();
+        let due = task.due_at.clone();
+        let desc = format!("完成备注: {}", note);
+        tauri::async_runtime::spawn(async move { q.enqueue(tid, ttl, desc, due); });
+    }
+    
+    Ok(task)
+}
+
 fn map_task(row: &rusqlite::Row<'_>) -> rusqlite::Result<Task> {
     Ok(Task {
         id: row.get(0)?,
@@ -287,5 +322,7 @@ fn map_task(row: &rusqlite::Row<'_>) -> rusqlite::Result<Task> {
         created_at: row.get(13)?,
         updated_at: row.get(14)?,
         completed_at: row.get(15)?,
+        completion_note: row.get(16)?,
+        countdown_secs: row.get(17)?,
     })
 }

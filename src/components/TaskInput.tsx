@@ -1,7 +1,14 @@
 import { useState, useRef, useEffect, type FormEvent } from 'react'
-import { Plus, Calendar, Bell, Zap } from 'lucide-react'
+import { Plus, Calendar, Bell, Zap, Timer } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { useAddTask } from '@/hooks/useTasks'
+import { useAddTask, useSetCountdown } from '@/hooks/useTasks'
+
+const COUNTDOWN_PRESETS = [
+  { label: '1min', secs: 60 },
+  { label: '5min', secs: 300 },
+  { label: '15min', secs: 900 },
+  { label: '25min', secs: 1500 },
+]
 
 export function TaskInput() {
   const [title, setTitle] = useState(() => {
@@ -11,8 +18,10 @@ export function TaskInput() {
   const [expanded, setExpanded] = useState(false)
   const [deadline, setDeadline] = useState('')
   const [reminder, setReminder] = useState('')
+  const [countdownSecs, setCountdownSecs] = useState(0)
   const inputRef = useRef<HTMLInputElement>(null)
   const addTask = useAddTask()
+  const setCountdown = useSetCountdown()
 
   useEffect(() => {
     const handler = () => inputRef.current?.focus()
@@ -46,10 +55,14 @@ export function TaskInput() {
     const dueAt = deadline ? new Date(deadline).toISOString() : null
     const remindAt = reminder ? new Date(reminder).toISOString() : null
 
-    await addTask.mutateAsync({ title: trimmed, due_at: dueAt, remind_at: remindAt })
+    const newTask = await addTask.mutateAsync({ title: trimmed, due_at: dueAt, remind_at: remindAt })
+    if (countdownSecs > 0 && newTask) {
+      await setCountdown.mutateAsync({ id: newTask.id, countdownSecs })
+    }
     setTitle('')
     setDeadline('')
     setReminder('')
+    setCountdownSecs(0)
     setExpanded(false)
     try { localStorage.removeItem('task-draft') } catch { /* ok */ }
     inputRef.current?.focus()
@@ -117,38 +130,64 @@ export function TaskInput() {
         </div>
 
         {expanded && (
-          <div className="mt-2 flex gap-2 animate-slide-up">
-            <div className="flex-1">
-              <label className="text-[10px] text-text-tertiary flex items-center gap-1 mb-1">
-                <Calendar size={10} /> 截止日期
-              </label>
-              <input
-                type="datetime-local"
-                value={deadline}
-                onChange={(e) => setDeadline(e.target.value)}
-                className={cn(
-                  'w-full bg-surface-2 border border-surface-3 rounded-md px-2 py-1.5',
-                  'text-xs text-text-primary',
-                  'outline-none focus:border-accent-500/50 focus:ring-1 focus:ring-accent-500/25',
-                  'transition-colors duration-150',
-                )}
-              />
+          <div className="mt-2 animate-slide-up">
+            <div className="flex gap-2 mb-2">
+              <div className="flex-1">
+                <label className="text-[10px] text-text-tertiary flex items-center gap-1 mb-1">
+                  <Calendar size={10} /> 截止日期
+                </label>
+                <input
+                  type="datetime-local"
+                  value={deadline}
+                  onChange={(e) => setDeadline(e.target.value)}
+                  className={cn(
+                    'w-full bg-surface-2 border border-surface-3 rounded-md px-2 py-1.5',
+                    'text-xs text-text-primary',
+                    'outline-none focus:border-accent-500/50 focus:ring-1 focus:ring-accent-500/25',
+                    'transition-colors duration-150',
+                  )}
+                />
+              </div>
+              <div className="flex-1">
+                <label className="text-[10px] text-text-tertiary flex items-center gap-1 mb-1">
+                  <Bell size={10} /> 提醒时间
+                </label>
+                <input
+                  type="datetime-local"
+                  value={reminder}
+                  onChange={(e) => setReminder(e.target.value)}
+                  className={cn(
+                    'w-full bg-surface-2 border border-surface-3 rounded-md px-2 py-1.5',
+                    'text-xs text-text-primary',
+                    'outline-none focus:border-accent-500/50 focus:ring-1 focus:ring-accent-500/25',
+                    'transition-colors duration-150',
+                  )}
+                />
+              </div>
             </div>
-            <div className="flex-1">
+
+            {/* Countdown presets */}
+            <div>
               <label className="text-[10px] text-text-tertiary flex items-center gap-1 mb-1">
-                <Bell size={10} /> 提醒时间
+                <Timer size={10} /> 倒计时
               </label>
-              <input
-                type="datetime-local"
-                value={reminder}
-                onChange={(e) => setReminder(e.target.value)}
-                className={cn(
-                  'w-full bg-surface-2 border border-surface-3 rounded-md px-2 py-1.5',
-                  'text-xs text-text-primary',
-                  'outline-none focus:border-accent-500/50 focus:ring-1 focus:ring-accent-500/25',
-                  'transition-colors duration-150',
-                )}
-              />
+              <div className="flex gap-1">
+                {COUNTDOWN_PRESETS.map((preset) => (
+                  <button
+                    key={preset.secs}
+                    type="button"
+                    onClick={() => setCountdownSecs(countdownSecs === preset.secs ? 0 : preset.secs)}
+                    className={cn(
+                      'px-2 py-1 rounded text-[10px] font-medium transition-colors',
+                      countdownSecs === preset.secs
+                        ? 'bg-amber-500/20 text-amber-400'
+                        : 'bg-surface-2 text-text-tertiary hover:text-text-secondary hover:bg-surface-3',
+                    )}
+                  >
+                    {preset.label}
+                  </button>
+                ))}
+              </div>
             </div>
           </div>
         )}

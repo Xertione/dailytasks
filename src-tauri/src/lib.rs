@@ -181,6 +181,8 @@ pub fn run() {
             commands::tasks::update_progress,
             commands::tasks::update_star_rating,
             commands::tasks::complete_task_with_progress,
+            commands::tasks::set_countdown,
+            commands::tasks::complete_with_note,
             commands::ai::analyze_task_manually,
             commands::ai::get_ai_status,
             commands::settings::get_settings,
