@@ -1,0 +1,106 @@
+﻿name: CI
+
+# 触发条件：只有推送到 main 或 PR 到 main 才触发
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+# ──────────────────────────────────────────────────
+# jobs 部分：定义 3 个并行运行的 Job（厨房）
+# ──────────────────────────────────────────────────
+
+jobs:
+  # ====== Job 1：Rust 后端测试 ======
+  test-backend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: src-tauri
+    steps:
+      # 把代码从 GitHub 克隆到虚拟机
+      - uses: actions/checkout@v4
+
+      # 安装 Rust 编译器（dtolnay/rust-toolchain 是社区常用 Action）
+      - uses: dtolnay/rust-toolchain@stable
+
+      # Tauri 在 Linux 上需要 WebKit 等系统库才能编译
+      - name: Install system dependencies (for Tauri)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libwebkit2gtk-4.1-dev \
+            libappindicator3-dev \
+            librsvg2-dev \
+            patchelf \
+            libssl-dev
+
+      # 运行 23 项单元测试
+      - name: Run cargo test
+        run: cargo test
+
+  # ====== Job 2：前端代码检查 ======
+  lint-frontend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # actions/setup-node 是官方 Action，用来安装 Node.js
+      # cache: npm 会自动缓存 node_modules，下次跑更快
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      # npm ci = "clean install"，只读 package-lock.json，保证环境一致
+      - name: Install dependencies
+        run: npm ci
+
+      # 跑 oxlint 检查代码风格
+      - name: Lint check
+        run: npm run lint
+
+  # ====== Job 3：完整构建验证 ======
+  # 这个 Job 同时需要 Rust + Node.js，所以两个都装
+  build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: src-tauri
+    steps:
+      - uses: actions/checkout@v4
+
+      # 安装 Rust
+      - uses: dtolnay/rust-toolchain@stable
+
+      # 安装 Tauri 系统库
+      - name: Install system dependencies (for Tauri)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libwebkit2gtk-4.1-dev \
+            libappindicator3-dev \
+            librsvg2-dev \
+            patchelf \
+            libssl-dev
+
+      # 安装 Node.js
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      # 先装前端依赖（需要回到项目根目录，临时覆盖 working-directory）
+      - name: Install frontend dependencies
+        working-directory: .
+        run: npm ci
+
+      # 编译 Rust 后端（cargo build 会生成二进制文件）
+      - name: Build Rust backend
+        run: cargo build
+
+      # 构建前端（tsc + vite build，输出到 dist/）
+      - name: Build frontend
+        working-directory: .
+        run: npm run build
