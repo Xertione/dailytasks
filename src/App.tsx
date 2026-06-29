@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react'
+﻿import { useState, useCallback } from 'react'
 import { Settings } from 'lucide-react'
 import { ChatView } from '@/components/ChatView'
 import { useUiStore } from '@/stores/uiStore'
@@ -11,7 +11,6 @@ import { PomodoroView } from '@/components/PomodoroView'
 import { HistoryView } from '@/components/HistoryView'
 import { SettingsDialog } from '@/components/SettingsDialog'
 import { Toast } from '@/components/Toast'
-import { OnboardingView } from '@/components/OnboardingView'
 import { AppErrorBoundary } from '@/components/AppErrorBoundary'
 
 type Tab = 'tasks' | 'pomodoro' | 'history' | 'chat'
@@ -19,21 +18,6 @@ type Tab = 'tasks' | 'pomodoro' | 'history' | 'chat'
 function App() {
   const [tab, setTab] = useState<Tab>('tasks')
   const { toggleSettings } = useUiStore()
-
-  // Use localStorage flag instead of IPC to avoid bridge timing issues
-  const showOnboarding = !(typeof window !== 'undefined'
-    && localStorage.getItem('daily-tasks-api-key') === 'true')
-
-  if (showOnboarding) {
-    return (
-      <AppErrorBoundary>
-        <OnboardingView onComplete={() => {
-          localStorage.setItem('daily-tasks-api-key', 'true')
-          window.location.reload()
-        }} />
-      </AppErrorBoundary>
-    )
-  }
 
   useTaskAnalyzedEvent()
   useReminderEvent()

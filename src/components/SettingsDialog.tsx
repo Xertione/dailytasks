@@ -1,8 +1,9 @@
-import { X, RefreshCw, CheckCircle, XCircle, AlertTriangle } from 'lucide-react'
+﻿import { useState } from 'react'
+import { X, RefreshCw, CheckCircle, XCircle, AlertTriangle, ClipboardPaste, Save, Check } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useUiStore, type NudgeStyle } from '@/stores/uiStore'
 import { useTasks, useTodayStats } from '@/hooks/useTasks'
-import { getAiStatus, type AiStatus } from '@/lib/ipc'
+import { getAiStatus, saveApiKey, type AiStatus } from '@/lib/ipc'
 import { useQuery } from '@tanstack/react-query'
 
 const nudgeOptions: { value: NudgeStyle; label: string; desc: string }[] = [
@@ -28,11 +29,41 @@ export function SettingsDialog() {
     staleTime: 30_000,
   })
 
+  const [apiKeyInput, setApiKeyInput] = useState('')
+  const [saving, setSaving] = useState(false)
+  const [saveMsg, setSaveMsg] = useState<{ ok: boolean; text: string } | null>(null)
+
   if (!isSettingsOpen) return null
 
   const totalTasks = stats?.total_cnt ?? (tasks?.length ?? 0)
   const completedTasks = stats?.completed_cnt ?? (tasks?.filter(t => t.status === 'done').length ?? 0)
   const completionRate = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0
+
+  const handlePaste = async () => {
+    try {
+      const text = await navigator.clipboard.readText()
+      setApiKeyInput(text.trim())
+      setSaveMsg(null)
+    } catch {
+      // ignore
+    }
+  }
+
+  const handleSaveApiKey = async () => {
+    if (!apiKeyInput.trim()) return
+    setSaving(true)
+    setSaveMsg(null)
+    try {
+      await saveApiKey(apiKeyInput.trim())
+      setSaveMsg({ ok: true, text: 'API Key 已保存' })
+      setApiKeyInput('')
+      refetchAiStatus()
+    } catch {
+      setSaveMsg({ ok: false, text: '保存失败，请重试' })
+    } finally {
+      setSaving(false)
+    }
+  }
 
   return (
     <div className="absolute inset-0 z-50 flex items-center justify-center">
@@ -100,6 +131,66 @@ export function SettingsDialog() {
             </div>
           </div>
 
+          {/* API Key — 像修改密码一样随时修改 */}
+          <div>
+            <label className="text-xs font-medium text-text-secondary mb-2 block">
+              API Key
+            </label>
+            <div className="space-y-2">
+              <div className="flex gap-2">
+                <input
+                  type="password"
+                  value={apiKeyInput}
+                  onChange={(e) => {
+                    setApiKeyInput(e.target.value)
+                    setSaveMsg(null)
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') handleSaveApiKey()
+                  }}
+                  placeholder={aiStatus?.key_preview || '输入新的 API Key'}
+                  className="flex-1 bg-surface-2 border border-surface-3 rounded-lg px-3 py-2 text-sm text-text-primary placeholder:text-text-disabled focus:outline-none focus:border-accent-500 focus:ring-1 focus:ring-accent-500/30 transition-all"
+                />
+                <button
+                  onClick={handlePaste}
+                  className="shrink-0 px-3 py-2 rounded-lg bg-surface-2 border border-surface-3 text-text-tertiary hover:text-text-secondary hover:bg-surface-3 transition-colors"
+                  title="从剪贴板粘贴"
+                >
+                  <ClipboardPaste size={16} />
+                </button>
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={handleSaveApiKey}
+                  disabled={!apiKeyInput.trim() || saving}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all
+                    enabled:bg-accent-500 enabled:text-white enabled:hover:bg-accent-400 enabled:active:scale-[0.98]
+                    disabled:bg-surface-2 disabled:text-text-disabled disabled:cursor-not-allowed"
+                >
+                  <Save size={14} />
+                  {saving ? '保存中...' : '修改 Key'}
+                </button>
+                {saveMsg && (
+                  <span className={cn(
+                    'text-xs flex items-center gap-1',
+                    saveMsg.ok ? 'text-success' : 'text-danger',
+                  )}>
+                    {saveMsg.ok ? <Check size={12} /> : <X size={12} />}
+                    {saveMsg.text}
+                  </span>
+                )}
+              </div>
+              <a
+                href="https://platform.deepseek.com/api_keys"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="block text-[11px] text-accent-400 hover:text-accent-300 underline underline-offset-2 transition-colors"
+              >
+                获取 DeepSeek API Key →
+              </a>
+            </div>
+          </div>
+
           {/* AI Status */}
           <div>
             <div className="flex items-center justify-between mb-2">
@@ -163,6 +254,8 @@ export function SettingsDialog() {
               <div className="text-[11px] text-text-disabled">无法获取状态</div>
             )}
           </div>
+
+          {/* Data statistics */}
           <div>
             <label className="text-xs font-medium text-text-secondary mb-2 block">
               数据统计
